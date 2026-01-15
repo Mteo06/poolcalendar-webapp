@@ -10,33 +10,103 @@ export const useAuth = () => {
   useEffect(() => {
     let mounted = true;
 
+    const setSafeState = (setter, value) => {
+      if (mounted) setter(value);
+    };
+
+    const loadProfile = async (userId) => {
+      console.log('🔵 START loadProfile for:', userId);
+
+      try {
+        const { data, error, status } = await supabase
+          .from('user_profiles')
+          .select('*')
+          .eq('id', userId)
+          .single();
+
+        console.log('🔵 Query result:', { data, error, status });
+
+        if (data) {
+          setSafeState(setProfile, data);
+        } else if (error) {
+          if (status === 406 || (error.details && error.details.includes('Results contain 0 rows'))) {
+            console.log('⚠️ Profile not found, creating...');
+            await createProfile(userId);
+            return; // createProfile chiama già setLoading(false)
+          } else {
+            console.error('❌ Error loading profile:', error);
+          }
+        } else {
+          console.warn('⚠️ loadProfile: no data, no error');
+        }
+      } catch (err) {
+        console.error('💥 Exception in loadProfile:', err);
+      } finally {
+        setSafeState(setLoading, false);
+        console.log('🔵 END loadProfile, loading = false');
+      }
+    };
+
+    const createProfile = async (userId) => {
+      console.log('🟢 START createProfile for:', userId);
+
+      try {
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+
+        const newProfile = {
+          id: userId,
+          username: currentUser?.user_metadata?.username || currentUser?.email?.split('@')[0] || 'utente',
+          email: currentUser?.email || '',
+          name: '',
+          surname: ''
+        };
+
+        console.log('🟢 Inserting profile:', newProfile);
+
+        const { data, error } = await supabase
+          .from('user_profiles')
+          .insert([newProfile])
+          .select()
+          .single();
+
+        if (data) {
+          setSafeState(setProfile, data);
+          console.log('✅ Profile created');
+        } else if (error) {
+          console.error('❌ Error creating profile:', error);
+        }
+      } catch (err) {
+        console.error('💥 Exception in createProfile:', err);
+      } finally {
+        setSafeState(setLoading, false);
+        console.log('🟢 END createProfile, loading = false');
+      }
+    };
+
     const initAuth = async () => {
       try {
         console.log('🟡 START initAuth');
         const { data: { session } } = await supabase.auth.getSession();
         console.log('🟡 Session:', session?.user?.email);
-        
+
         if (!mounted) return;
 
         if (session?.user) {
-          setUser(session.user);
+          setSafeState(setUser, session.user);
           const confirmed = session.user.email_confirmed_at !== null;
-          setEmailConfirmed(confirmed);
-          
+          setSafeState(setEmailConfirmed, confirmed);
+
           if (confirmed) {
-            console.log('🟡 Calling loadProfile...');
             await loadProfile(session.user.id);
           } else {
-            console.log('🟡 Email not confirmed, setLoading(false)');
-            setLoading(false);
+            setSafeState(setLoading, false);
           }
         } else {
-          console.log('🟡 No session, setLoading(false)');
-          setLoading(false);
+          setSafeState(setLoading, false);
         }
       } catch (err) {
         console.error('❌ Init auth error:', err);
-        if (mounted) setLoading(false);
+        setSafeState(setLoading, false);
       }
     };
 
@@ -45,24 +115,24 @@ export const useAuth = () => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log('🟡 Auth event:', event);
+
         if (!mounted) return;
 
         if (session?.user) {
-          setUser(session.user);
+          setSafeState(setUser, session.user);
           const confirmed = session.user.email_confirmed_at !== null;
-          setEmailConfirmed(confirmed);
-          
+          setSafeState(setEmailConfirmed, confirmed);
+
           if (confirmed) {
-            console.log('🟡 onAuthStateChange calling loadProfile...');
             await loadProfile(session.user.id);
           } else {
-            setLoading(false);
+            setSafeState(setLoading, false);
           }
         } else if (event === 'SIGNED_OUT') {
-          setUser(null);
-          setProfile(null);
-          setEmailConfirmed(true);
-          setLoading(false);
+          setSafeState(setUser, null);
+          setSafeState(setProfile, null);
+          setSafeState(setEmailConfirmed, true);
+          setSafeState(setLoading, false);
         }
       }
     );
@@ -73,87 +143,7 @@ export const useAuth = () => {
     };
   }, []);
 
-  const loadProfile = async (userId) => {
-  console.log('🔵 START loadProfile for:', userId);
-
-  try {
-    console.log('🔵 Executing query...');
-
-    const { data, error, status } = await supabase
-      .from('user_profiles')
-      .select('*')
-      .eq('id', userId)
-      .single();
-
-    console.log('🔵 Query completed:', { data, error, status });
-
-    if (data) {
-      console.log('✅ Profile found, setting state');
-      setProfile(data);
-      setLoading(false);
-    } else if (error) {
-      // Gestione caso "record non trovato"
-      if (status === 406 || (error.details && error.details.includes('Results contain 0 rows'))) {
-        console.log('⚠️ Profile not found, creating...');
-        await createProfile(userId);
-      } else {
-        console.error('❌ Error loading profile:', error);
-        setLoading(false);
-      }
-    } else {
-      // Fallback: nessun data e nessun error
-      console.warn('⚠️ loadProfile: no data, no error');
-      setLoading(false);
-    }
-  } catch (err) {
-    console.error('💥 Exception in loadProfile:', err);
-    setLoading(false);
-  }
-
-  console.log('🔵 END loadProfile');
-};
-
-const createProfile = async (userId) => {
-  console.log('🟢 START createProfile for:', userId);
-
-  try {
-    const { data: { user: currentUser } } = await supabase.auth.getUser();
-
-    const newProfile = {
-      id: userId,
-      username: currentUser?.user_metadata?.username || currentUser?.email?.split('@')[0] || 'utente',
-      email: currentUser?.email || '',
-      name: '',
-      surname: ''
-    };
-
-    console.log('🟢 Inserting profile:', newProfile);
-
-    const { data, error } = await supabase
-      .from('user_profiles')
-      .insert([newProfile])
-      .select()
-      .single();
-
-    console.log('🟢 Insert result:', { data, error });
-
-    if (data) {
-      console.log('✅ Profile created, setting state');
-      setProfile(data);
-    } else if (error) {
-      console.error('❌ Error creating profile:', error);
-    }
-  } catch (err) {
-    console.error('💥 Exception in createProfile:', err);
-  } finally {
-    // Assicurati sempre di chiudere il loading
-    setLoading(false);
-    console.log('✅ createProfile finished, loading = false');
-  }
-
-  console.log('🟢 END createProfile');
-};
-
+  // --- Funzioni Auth ---
   const signUp = async (email, password, username) => {
     try {
       const { data, error } = await supabase.auth.signUp({
@@ -164,7 +154,6 @@ const createProfile = async (userId) => {
           emailRedirectTo: window.location.origin
         }
       });
-
       if (error) throw error;
       return { success: true, data, needsEmailConfirmation: !data.session };
     } catch (error) {
@@ -174,16 +163,11 @@ const createProfile = async (userId) => {
 
   const signIn = async (email, password, rememberMe = false) => {
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password
-      });
-
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
 
       if (!rememberMe) {
-        const keys = Object.keys(localStorage);
-        keys.forEach(key => {
+        Object.keys(localStorage).forEach(key => {
           if (key.startsWith('sb-')) {
             const value = localStorage.getItem(key);
             sessionStorage.setItem(key, value);
@@ -200,30 +184,22 @@ const createProfile = async (userId) => {
 
   const signOut = async () => {
     await supabase.auth.signOut();
-    
-    const localKeys = Object.keys(localStorage);
-    const sessionKeys = Object.keys(sessionStorage);
-    
-    [...localKeys, ...sessionKeys].forEach(key => {
+    [...Object.keys(localStorage), ...Object.keys(sessionStorage)].forEach(key => {
       if (key.startsWith('sb-')) {
         localStorage.removeItem(key);
         sessionStorage.removeItem(key);
       }
     });
-
     setUser(null);
     setProfile(null);
     setEmailConfirmed(true);
+    setLoading(false);
   };
 
   const resendConfirmationEmail = async () => {
     if (!user?.email) return { success: false };
     try {
-      const { error } = await supabase.auth.resend({
-        type: 'signup',
-        email: user.email
-      });
-
+      const { error } = await supabase.auth.resend({ type: 'signup', email: user.email });
       if (error) throw error;
       return { success: true };
     } catch (error) {
