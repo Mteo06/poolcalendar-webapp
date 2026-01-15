@@ -74,81 +74,85 @@ export const useAuth = () => {
   }, []);
 
   const loadProfile = async (userId) => {
-    console.log('🔵 START loadProfile for:', userId);
-    
-    try {
-      console.log('🔵 Executing query...');
-      
-      const { data, error } = await supabase
-        .from('user_profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
+  console.log('🔵 START loadProfile for:', userId);
 
-      console.log('🔵 Query completed:', { data, error });
+  try {
+    console.log('🔵 Executing query...');
 
-      if (data) {
-        console.log('✅ Profile found, setting state');
-        setProfile(data);
-        setLoading(false); // ← IMPORTANTE
-        console.log('✅ Profile state set, loading = false');
-      } else if (error && error.code === 'PGRST116') {
-        console.log('⚠️ Profile not found (PGRST116), creating...');
+    const { data, error, status } = await supabase
+      .from('user_profiles')
+      .select('*')
+      .eq('id', userId)
+      .single();
+
+    console.log('🔵 Query completed:', { data, error, status });
+
+    if (data) {
+      console.log('✅ Profile found, setting state');
+      setProfile(data);
+      setLoading(false);
+    } else if (error) {
+      // Gestione caso "record non trovato"
+      if (status === 406 || (error.details && error.details.includes('Results contain 0 rows'))) {
+        console.log('⚠️ Profile not found, creating...');
         await createProfile(userId);
-      } else if (error) {
+      } else {
         console.error('❌ Error loading profile:', error);
-        setLoading(false); // ← Anche in caso di errore
+        setLoading(false);
       }
-    } catch (err) {
-      console.error('💥 Exception in loadProfile:', err);
-      setLoading(false); // ← Anche in caso di eccezione
+    } else {
+      // Fallback: nessun data e nessun error
+      console.warn('⚠️ loadProfile: no data, no error');
+      setLoading(false);
     }
-    
-    console.log('🔵 END loadProfile');
-  };
+  } catch (err) {
+    console.error('💥 Exception in loadProfile:', err);
+    setLoading(false);
+  }
 
-  const createProfile = async (userId) => {
-    console.log('🟢 START createProfile for:', userId);
-    
-    try {
-      console.log('🟢 Getting current user...');
-      const { data: { user: currentUser } } = await supabase.auth.getUser();
-      console.log('🟢 Current user:', currentUser?.email);
-      
-      const newProfile = {
-        id: userId,
-        username: currentUser?.user_metadata?.username || currentUser?.email?.split('@')[0] || 'utente',
-        email: currentUser?.email || '',
-        name: '',
-        surname: ''
-      };
-      
-      console.log('🟢 Inserting profile:', newProfile);
-      
-      const { data, error } = await supabase
-        .from('user_profiles')
-        .insert([newProfile])
-        .select()
-        .single();
+  console.log('🔵 END loadProfile');
+};
 
-      console.log('🟢 Insert result:', { data, error });
+const createProfile = async (userId) => {
+  console.log('🟢 START createProfile for:', userId);
 
-      if (data) {
-        console.log('✅ Profile created, setting state');
-        setProfile(data);
-        setLoading(false); // ← IMPORTANTE
-        console.log('✅ Profile state set, loading = false');
-      } else if (error) {
-        console.error('❌ Error creating profile:', error);
-        setLoading(false); // ← Anche in caso di errore
-      }
-    } catch (err) {
-      console.error('💥 Exception in createProfile:', err);
-      setLoading(false); // ← Anche in caso di eccezione
+  try {
+    const { data: { user: currentUser } } = await supabase.auth.getUser();
+
+    const newProfile = {
+      id: userId,
+      username: currentUser?.user_metadata?.username || currentUser?.email?.split('@')[0] || 'utente',
+      email: currentUser?.email || '',
+      name: '',
+      surname: ''
+    };
+
+    console.log('🟢 Inserting profile:', newProfile);
+
+    const { data, error } = await supabase
+      .from('user_profiles')
+      .insert([newProfile])
+      .select()
+      .single();
+
+    console.log('🟢 Insert result:', { data, error });
+
+    if (data) {
+      console.log('✅ Profile created, setting state');
+      setProfile(data);
+    } else if (error) {
+      console.error('❌ Error creating profile:', error);
     }
-    
-    console.log('🟢 END createProfile');
-  };
+  } catch (err) {
+    console.error('💥 Exception in createProfile:', err);
+  } finally {
+    // Assicurati sempre di chiudere il loading
+    setLoading(false);
+    console.log('✅ createProfile finished, loading = false');
+  }
+
+  console.log('🟢 END createProfile');
+};
 
   const signUp = async (email, password, username) => {
     try {
