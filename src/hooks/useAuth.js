@@ -79,36 +79,51 @@ export const useAuth = () => {
   }, []);
 
   const loadProfile = async (userId) => {
-    try {
-      console.log('Loading profile for user:', userId);
+  try {
+    console.log('Loading profile for user:', userId);
 
-      // Prima prova a caricare il profilo esistente
-      const { data: existingProfile, error: fetchError } = await supabase
-        .from('user_profiles')
-        .select('*')
-        .eq('id', userId)
-        .limit(1);
+    // Aggiungi timeout di 10 secondi
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Profile fetch timeout')), 10000)
+    );
 
-      console.log('Profile fetch result:', { data: existingProfile, error: fetchError });
+    const fetchPromise = supabase
+      .from('user_profiles')
+      .select('*')
+      .eq('id', userId)
+      .limit(1);
 
-      if (existingProfile && existingProfile.length > 0) {
-        // Profilo trovato
-        console.log('✅ Profile found:', existingProfile[0]);
-        setProfile(existingProfile[0]);
-        setLoading(false);
-        return;
-      }
+    // Race tra query e timeout
+    const { data: existingProfile, error: fetchError } = await Promise.race([
+      fetchPromise,
+      timeoutPromise
+    ]);
 
-      // Profilo non trovato, crealo
-      console.log('⚠️ Profile not found, creating...');
-      await createProfile(userId);
+    console.log('Profile fetch result:', { data: existingProfile, error: fetchError });
 
-    } catch (err) {
-      console.error('Exception loading profile:', err);
-      // In caso di errore, crea comunque il profilo
-      await createProfile(userId);
+    if (existingProfile && existingProfile.length > 0) {
+      console.log('✅ Profile found:', existingProfile[0]);
+      setProfile(existingProfile[0]);
+      setLoading(false);
+      return;
     }
-  };
+
+    // Profilo non trovato, crealo
+    console.log('⚠️ Profile not found, creating...');
+    await createProfile(userId);
+
+  } catch (err) {
+    console.error('Exception loading profile:', err);
+    
+    // Se è timeout o altro errore, crea il profilo
+    if (err.message === 'Profile fetch timeout') {
+      console.log('⏱️ Timeout - creating profile...');
+    }
+    
+    await createProfile(userId);
+  }
+};
+
 
   const createProfile = async (userId) => {
     try {
