@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Analytics } from '@vercel/analytics/react';
 import { useAuth } from './hooks/useAuth';
 import { useShifts } from './hooks/useShifts';
 import { useCompanies } from './hooks/useCompanies';
@@ -111,6 +112,7 @@ function App() {
           />
         )}
       </main>
+      <Analytics />
     </div>
   );
 }
