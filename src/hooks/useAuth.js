@@ -14,42 +14,7 @@ export const useAuth = () => {
       if (mounted) setter(value);
     };
 
-    const loadProfile = async (userId) => {
-      console.log('🔵 START loadProfile for:', userId);
-
-      try {
-        const { data, error, status } = await supabase
-          .from('user_profiles')
-          .select('*')
-          .eq('id', userId)
-          .single();
-
-        console.log('🔵 Query result:', { data, error, status });
-
-        if (data) {
-          setSafeState(setProfile, data);
-        } else if (error) {
-          if (status === 406 || (error.details && error.details.includes('Results contain 0 rows'))) {
-            console.log('⚠️ Profile not found, creating...');
-            await createProfile(userId);
-            return; // createProfile chiama già setLoading(false)
-          } else {
-            console.error('❌ Error loading profile:', error);
-          }
-        } else {
-          console.warn('⚠️ loadProfile: no data, no error');
-        }
-      } catch (err) {
-        console.error('💥 Exception in loadProfile:', err);
-      } finally {
-        setSafeState(setLoading, false);
-        console.log('🔵 END loadProfile, loading = false');
-      }
-    };
-
     const createProfile = async (userId) => {
-      console.log('🟢 START createProfile for:', userId);
-
       try {
         const { data: { user: currentUser } } = await supabase.auth.getUser();
 
@@ -61,8 +26,6 @@ export const useAuth = () => {
           surname: ''
         };
 
-        console.log('🟢 Inserting profile:', newProfile);
-
         const { data, error } = await supabase
           .from('user_profiles')
           .insert([newProfile])
@@ -71,7 +34,6 @@ export const useAuth = () => {
 
         if (data) {
           setSafeState(setProfile, data);
-          console.log('✅ Profile created');
         } else if (error) {
           console.error('❌ Error creating profile:', error);
         }
@@ -79,15 +41,40 @@ export const useAuth = () => {
         console.error('💥 Exception in createProfile:', err);
       } finally {
         setSafeState(setLoading, false);
-        console.log('🟢 END createProfile, loading = false');
+      }
+    };
+
+    const fetchProfile = async (userId) => {
+      try {
+        const { data, error, status } = await supabase
+          .from('user_profiles')
+          .select('*')
+          .eq('id', userId)
+          .single();
+
+        if (data) {
+          setSafeState(setProfile, data);
+        } else if (error) {
+          // Se profilo non esiste, crealo
+          if (status === 406 || (error.details?.includes('0 rows'))) {
+            await createProfile(userId);
+            return;
+          } else {
+            console.error('❌ Error loading profile:', error);
+          }
+        } else {
+          console.warn('⚠️ fetchProfile: no data, no error');
+        }
+      } catch (err) {
+        console.error('💥 Exception in fetchProfile:', err);
+      } finally {
+        setSafeState(setLoading, false);
       }
     };
 
     const initAuth = async () => {
       try {
-        console.log('🟡 START initAuth');
         const { data: { session } } = await supabase.auth.getSession();
-        console.log('🟡 Session:', session?.user?.email);
 
         if (!mounted) return;
 
@@ -97,7 +84,7 @@ export const useAuth = () => {
           setSafeState(setEmailConfirmed, confirmed);
 
           if (confirmed) {
-            await loadProfile(session.user.id);
+            fetchProfile(session.user.id); // 🔹 senza await
           } else {
             setSafeState(setLoading, false);
           }
@@ -112,30 +99,26 @@ export const useAuth = () => {
 
     initAuth();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log('🟡 Auth event:', event);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!mounted) return;
 
-        if (!mounted) return;
+      if (session?.user) {
+        setSafeState(setUser, session.user);
+        const confirmed = session.user.email_confirmed_at !== null;
+        setSafeState(setEmailConfirmed, confirmed);
 
-        if (session?.user) {
-          setSafeState(setUser, session.user);
-          const confirmed = session.user.email_confirmed_at !== null;
-          setSafeState(setEmailConfirmed, confirmed);
-
-          if (confirmed) {
-            await loadProfile(session.user.id);
-          } else {
-            setSafeState(setLoading, false);
-          }
-        } else if (event === 'SIGNED_OUT') {
-          setSafeState(setUser, null);
-          setSafeState(setProfile, null);
-          setSafeState(setEmailConfirmed, true);
+        if (confirmed) {
+          fetchProfile(session.user.id); // 🔹 senza await
+        } else {
           setSafeState(setLoading, false);
         }
+      } else if (event === 'SIGNED_OUT') {
+        setSafeState(setUser, null);
+        setSafeState(setProfile, null);
+        setSafeState(setEmailConfirmed, true);
+        setSafeState(setLoading, false);
       }
-    );
+    });
 
     return () => {
       mounted = false;
