@@ -9,14 +9,27 @@ export const useAuth = () => {
 
   useEffect(() => {
     let mounted = true;
+    let sessionCheckTimeout = null;
 
     const initAuth = async () => {
       try {
+        // Timeout per evitare loop infiniti
+        sessionCheckTimeout = setTimeout(() => {
+          if (mounted && loading) {
+            console.warn('Session check timeout - forcing complete');
+            setLoading(false);
+          }
+        }, 5000);
+
         const { data: { session }, error } = await supabase.auth.getSession();
         
+        if (sessionCheckTimeout) {
+          clearTimeout(sessionCheckTimeout);
+        }
+
         if (error) {
           console.error('Session error:', error);
-          setLoading(false);
+          if (mounted) setLoading(false);
           return;
         }
 
@@ -37,6 +50,9 @@ export const useAuth = () => {
         }
       } catch (err) {
         console.error('Init auth error:', err);
+        if (sessionCheckTimeout) {
+          clearTimeout(sessionCheckTimeout);
+        }
         if (mounted) setLoading(false);
       }
     };
@@ -48,6 +64,11 @@ export const useAuth = () => {
         console.log('Auth event:', event);
         
         if (!mounted) return;
+
+        // Ignora eventi INITIAL_SESSION per evitare doppi caricamenti
+        if (event === 'INITIAL_SESSION') {
+          return;
+        }
 
         if (session?.user) {
           setUser(session.user);
@@ -70,6 +91,9 @@ export const useAuth = () => {
 
     return () => {
       mounted = false;
+      if (sessionCheckTimeout) {
+        clearTimeout(sessionCheckTimeout);
+      }
       subscription.unsubscribe();
     };
   }, []);
@@ -80,61 +104,80 @@ export const useAuth = () => {
         .from('user_profiles')
         .select('*')
         .eq('id', userId)
-        .single();
+        .maybeSingle(); // Usa maybeSingle invece di single per evitare errori
 
       if (!mounted) return;
 
       if (data) {
         setProfile(data);
-      } else if (error && error.code === 'PGRST116') {
-        // Profilo non trovato, crealo
-        await createProfile(userId, mounted);
-      } else {
+      } else if (error) {
         console.error('Error loading profile:', error);
+        // Crea profilo solo se l'errore è "not found"
+        if (error.code === 'PGRST116') {
+          await createProfile(userId, mounted);
+        }
+      } else {
+        // Nessun dato e nessun errore = profilo non esiste
+        await createProfile(userId, mounted);
       }
     } catch (err) {
       console.error('Exception loading profile:', err);
+      if (mounted) {
+        // Crea profilo di fallback
+        await createProfile(userId, mounted);
+      }
     } finally {
       if (mounted) setLoading(false);
     }
   };
 
- 
-const createProfile = async (userId, mounted = true) => {
-  try {
-    const { data: { user: currentUser } } = await supabase.auth.getUser();
-    
-    const { data, error } = await supabase
-      .from('user_profiles')
-      .insert([{
-        id: userId,
-        username: currentUser?.user_metadata?.username || currentUser?.email?.split('@')[0] || 'utente',
-        email: currentUser?.email || '',
-        name: '',
-        surname: ''
-      }])
-      .select()
-      .single();
+  const createProfile = async (userId, mounted = true) => {
+    try {
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      
+      if (!currentUser || !mounted) return;
 
-    if (!mounted) return;
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .insert([{
+          id: userId,
+          username: currentUser?.user_metadata?.username || currentUser?.email?.split('@')[0] || 'utente',
+          email: currentUser?.email || '',
+          name: '',
+          surname: ''
+        }])
+        .select()
+        .maybeSingle();
 
-    if (data) {
-      setProfile(data);
-    } else if (error) {
-      console.error('Error creating profile:', error);
-      setProfile({
-        id: userId,
-        username: currentUser?.user_metadata?.username || 'utente',
-        email: currentUser?.email || '',
-        name: '',
-        surname: ''
-      });
+      if (!mounted) return;
+
+      if (data) {
+        setProfile(data);
+      } else if (error) {
+        console.error('Error creating profile:', error);
+        // Fallback profile
+        setProfile({
+          id: userId,
+          username: currentUser?.user_metadata?.username || 'utente',
+          email: currentUser?.email || '',
+          name: '',
+          surname: ''
+        });
+      }
+    } catch (err) {
+      console.error('Exception creating profile:', err);
+      if (mounted) {
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        setProfile({
+          id: userId,
+          username: currentUser?.user_metadata?.username || 'utente',
+          email: currentUser?.email || '',
+          name: '',
+          surname: ''
+        });
+      }
     }
-  } catch (err) {
-    console.error('Exception creating profile:', err);
-  }
-};
-
+  };
 
   const signUp = async (email, password, username) => {
     try {
@@ -163,10 +206,23 @@ const createProfile = async (userId, mounted = true) => {
 
       if (error) throw error;
 
-      // Gestisci la persistenza della sessione
+      // Se rememberMe è false, forza sessione non persistente
       if (!rememberMe) {
-        // Sessione solo per questa tab
-        localStorage.removeItem('supabase.auth.token');
+        // Cambia la sessione da persistente a temporanea
+        await supabase.auth.setSession({
+          access_token: data.session.access_token,
+          refresh_token: data.session.refresh_token
+        });
+        
+        // Rimuovi dai localStorage per renderla temporanea
+        const keys = Object.keys(localStorage);
+        keys.forEach(key => {
+          if (key.startsWith('sb-')) {
+            const value = localStorage.getItem(key);
+            sessionStorage.setItem(key, value);
+            localStorage.removeItem(key);
+          }
+        });
       }
 
       return { success: true, data };
@@ -177,6 +233,18 @@ const createProfile = async (userId, mounted = true) => {
 
   const signOut = async () => {
     await supabase.auth.signOut();
+    
+    // Pulisci sia localStorage che sessionStorage
+    const localKeys = Object.keys(localStorage);
+    const sessionKeys = Object.keys(sessionStorage);
+    
+    [...localKeys, ...sessionKeys].forEach(key => {
+      if (key.startsWith('sb-')) {
+        localStorage.removeItem(key);
+        sessionStorage.removeItem(key);
+      }
+    });
+
     setUser(null);
     setProfile(null);
     setEmailConfirmed(true);
