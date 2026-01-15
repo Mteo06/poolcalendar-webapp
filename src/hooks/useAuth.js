@@ -12,14 +12,8 @@ export const useAuth = () => {
 
     const initAuth = async () => {
       try {
-        const { data: { session }, error } = await supabase.auth.getSession();
+        const { data: { session } } = await supabase.auth.getSession();
         
-        if (error) {
-          console.error('Session error:', error);
-          if (mounted) setLoading(false);
-          return;
-        }
-
         if (!mounted) return;
 
         if (session?.user) {
@@ -29,12 +23,10 @@ export const useAuth = () => {
           
           if (confirmed) {
             await loadProfile(session.user.id);
-          } else {
-            if (mounted) setLoading(false);
           }
-        } else {
-          if (mounted) setLoading(false);
         }
+        
+        if (mounted) setLoading(false);
       } catch (err) {
         console.error('Init auth error:', err);
         if (mounted) setLoading(false);
@@ -45,13 +37,7 @@ export const useAuth = () => {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('Auth event:', event);
-        
         if (!mounted) return;
-
-        if (event === 'INITIAL_SESSION') {
-          return;
-        }
 
         if (session?.user) {
           setUser(session.user);
@@ -60,14 +46,11 @@ export const useAuth = () => {
           
           if (confirmed) {
             await loadProfile(session.user.id);
-          } else {
-            if (mounted) setLoading(false);
           }
         } else if (event === 'SIGNED_OUT') {
           setUser(null);
           setProfile(null);
           setEmailConfirmed(true);
-          if (mounted) setLoading(false);
         }
       }
     );
@@ -79,129 +62,49 @@ export const useAuth = () => {
   }, []);
 
   const loadProfile = async (userId) => {
-  try {
-    console.log('Loading profile for user:', userId);
+    try {
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
 
-    // Aggiungi timeout di 10 secondi
-    const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('Profile fetch timeout')), 10000)
-    );
-
-    const fetchPromise = supabase
-      .from('user_profiles')
-      .select('*')
-      .eq('id', userId)
-      .limit(1);
-
-    // Race tra query e timeout
-    const { data: existingProfile, error: fetchError } = await Promise.race([
-      fetchPromise,
-      timeoutPromise
-    ]);
-
-    console.log('Profile fetch result:', { data: existingProfile, error: fetchError });
-
-    if (existingProfile && existingProfile.length > 0) {
-      console.log('✅ Profile found:', existingProfile[0]);
-      setProfile(existingProfile[0]);
-      setLoading(false);
-      return;
+      if (data) {
+        setProfile(data);
+      } else if (error && error.code === 'PGRST116') {
+        // Profilo non trovato, crealo
+        await createProfile(userId);
+      } else if (error) {
+        console.error('Error loading profile:', error);
+      }
+    } catch (err) {
+      console.error('Exception loading profile:', err);
     }
-
-    // Profilo non trovato, crealo
-    console.log('⚠️ Profile not found, creating...');
-    await createProfile(userId);
-
-  } catch (err) {
-    console.error('Exception loading profile:', err);
-    
-    // Se è timeout o altro errore, crea il profilo
-    if (err.message === 'Profile fetch timeout') {
-      console.log('⏱️ Timeout - creating profile...');
-    }
-    
-    await createProfile(userId);
-  }
-};
-
+  };
 
   const createProfile = async (userId) => {
     try {
-      console.log('Creating profile for user:', userId);
-      
       const { data: { user: currentUser } } = await supabase.auth.getUser();
       
-      if (!currentUser) {
-        console.error('No current user found');
-        setLoading(false);
-        return;
-      }
-
-      const newProfile = {
-        id: userId,
-        username: currentUser?.user_metadata?.username || currentUser?.email?.split('@')[0] || 'utente',
-        email: currentUser?.email || '',
-        name: '',
-        surname: ''
-      };
-
-      console.log('Inserting new profile:', newProfile);
-
       const { data, error } = await supabase
         .from('user_profiles')
-        .insert([newProfile])
+        .insert([{
+          id: userId,
+          username: currentUser?.user_metadata?.username || currentUser?.email?.split('@')[0] || 'utente',
+          email: currentUser?.email || '',
+          name: '',
+          surname: ''
+        }])
         .select()
-        .limit(1);
+        .single();
 
-      if (error) {
+      if (data) {
+        setProfile(data);
+      } else if (error) {
         console.error('Error creating profile:', error);
-        
-        // Se l'errore è "già esistente", prova a ricaricarlo
-        if (error.code === '23505') {
-          console.log('Profile already exists, fetching...');
-          const { data: retryData } = await supabase
-            .from('user_profiles')
-            .select('*')
-            .eq('id', userId)
-            .limit(1);
-          
-          if (retryData && retryData.length > 0) {
-            setProfile(retryData[0]);
-            setLoading(false);
-            return;
-          }
-        }
-        
-        // Fallback: usa profilo in memoria
-        console.log('Using fallback profile');
-        setProfile(newProfile);
-        setLoading(false);
-        return;
       }
-
-      if (data && data.length > 0) {
-        console.log('✅ Profile created successfully:', data[0]);
-        setProfile(data[0]);
-      } else {
-        console.log('⚠️ No data returned, using fallback');
-        setProfile(newProfile);
-      }
-
-      setLoading(false);
-
     } catch (err) {
       console.error('Exception creating profile:', err);
-      
-      // Fallback finale
-      const { data: { user: currentUser } } = await supabase.auth.getUser();
-      setProfile({
-        id: userId,
-        username: currentUser?.user_metadata?.username || 'utente',
-        email: currentUser?.email || '',
-        name: '',
-        surname: ''
-      });
-      setLoading(false);
     }
   };
 
@@ -232,9 +135,7 @@ export const useAuth = () => {
 
       if (error) throw error;
 
-      // Gestione "rimani connesso"
       if (!rememberMe) {
-        // Sposta la sessione da localStorage a sessionStorage
         const keys = Object.keys(localStorage);
         keys.forEach(key => {
           if (key.startsWith('sb-')) {
@@ -254,7 +155,6 @@ export const useAuth = () => {
   const signOut = async () => {
     await supabase.auth.signOut();
     
-    // Pulisci storage
     const localKeys = Object.keys(localStorage);
     const sessionKeys = Object.keys(sessionStorage);
     
@@ -285,26 +185,6 @@ export const useAuth = () => {
     }
   };
 
-  const updateEmail = async (newEmail) => {
-    try {
-      const { error } = await supabase.auth.updateUser({ email: newEmail });
-      if (error) throw error;
-      return { success: true };
-    } catch (error) {
-      return { success: false, error: error.message };
-    }
-  };
-
-  const updatePassword = async (newPassword) => {
-    try {
-      const { error } = await supabase.auth.updateUser({ password: newPassword });
-      if (error) throw error;
-      return { success: true };
-    } catch (error) {
-      return { success: false, error: error.message };
-    }
-  };
-
   return {
     user,
     profile,
@@ -314,8 +194,6 @@ export const useAuth = () => {
     signIn,
     signOut,
     resendConfirmationEmail,
-    updateEmail,
-    updatePassword,
     isAuthenticated: !!user && emailConfirmed
   };
 };
