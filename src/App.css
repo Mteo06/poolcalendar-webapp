@@ -1,0 +1,147 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #f5f7fa;
+}
+
+.app-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background-color: #f5f7fa;
+  width: 100%;
+}
+
+.main-content {
+  flex: 1;
+  padding: 20px;
+  max-width: 1400px;
+  width: 100%;
+  margin: 0 auto;
+  padding-top: 80px;
+}
+
+/* Email confirmation */
+.email-confirm-message {
+  text-align: center;
+  padding: 20px;
+  background: #f8f9fa;
+  border-radius: 12px;
+  margin-bottom: 20px;
+}
+
+.email-confirm-message p {
+  margin: 12px 0;
+  color: #333;
+  line-height: 1.6;
+}
+
+.email-highlight {
+  font-weight: 700;
+  color: #667eea;
+  font-size: 18px;
+}
+
+.note {
+  font-size: 14px;
+  color: #666;
+  font-style: italic;
+}
+
+.pending-container {
+  min-height: 100vh;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 20px;
+}
+
+.pending-card {
+  background: white;
+  border-radius: 20px;
+  padding: 40px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  max-width: 500px;
+  width: 100%;
+  text-align: center;
+}
+
+.pending-card h1 {
+  color: #667eea;
+  margin-bottom: 20px;
+  font-size: 28px;
+}
+
+.pending-card p {
+  color: #666;
+  line-height: 1.8;
+  margin-bottom: 15px;
+}
+
+.resend-btn {
+  margin-top: 20px;
+  padding: 12px 24px;
+  background: #667eea;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background 0.3s;
+}
+
+.resend-btn:hover {
+  background: #5568d3;
+}
+
+.auth-success {
+  margin-top: 16px;
+  color: #22c55e;
+  font-weight: 600;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .main-content {
+    padding: 16px;
+    padding-top: 70px;
+  }
+
+  .pending-card {
+    padding: 30px 20px;
+  }
+
+  .pending-card h1 {
+    font-size: 24px;
+  }
+}
+
+@media (max-width: 480px) {
+  .main-content {
+    padding: 12px;
+    padding-top: 70px;
+  }
+
+  .pending-container {
+    padding: 16px;
+  }
+
+  .pending-card {
+    padding: 24px 16px;
+  }
+
+  .pending-card h1 {
+    font-size: 22px;
+  }
+}
