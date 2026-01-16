@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 import { useAuth } from './hooks/useAuth';
 import { useShifts } from './hooks/useShifts';
 import { useCompanies } from './hooks/useCompanies';
@@ -48,82 +49,103 @@ function App() {
 
   // Mostra reset password se necessario
   if (showResetPassword) {
-    return <ResetPasswordView onComplete={handleResetComplete} />;
+    return (
+      <>
+        <ResetPasswordView onComplete={handleResetComplete} />
+        <SpeedInsights />
+      </>
+    );
   }
 
   // Loading
   if (auth.loading) {
-    return <LoadingSpinner />;
+    return (
+      <>
+        <LoadingSpinner />
+        <SpeedInsights />
+      </>
+    );
   }
 
   // Email non confermata
   if (auth.user && !auth.emailConfirmed) {
     return (
-      <div className="pending-container">
-        <div className="pending-card">
-          <h1>📧 Conferma la tua email</h1>
-          <div className="email-confirm-message">
-            <p>Abbiamo inviato un'email di conferma a:</p>
-            <p className="email-highlight">{auth.user.email}</p>
-            <p>Clicca sul link nell'email per attivare il tuo account.</p>
-            <p className="note">Dopo aver confermato, ricarica questa pagina.</p>
+      <>
+        <div className="pending-container">
+          <div className="pending-card">
+            <h1>📧 Conferma la tua email</h1>
+            <div className="email-confirm-message">
+              <p>Abbiamo inviato un'email di conferma a:</p>
+              <p className="email-highlight">{auth.user.email}</p>
+              <p>Clicca sul link nell'email per attivare il tuo account.</p>
+              <p className="note">Dopo aver confermato, ricarica questa pagina.</p>
+            </div>
+            <button className="resend-btn" onClick={handleResendEmail}>
+              Reinvia email di conferma
+            </button>
+            {resendMessage && <p className="auth-success">{resendMessage}</p>}
           </div>
-          <button className="resend-btn" onClick={handleResendEmail}>
-            Reinvia email di conferma
-          </button>
-          {resendMessage && <p className="auth-success">{resendMessage}</p>}
         </div>
-      </div>
+        <SpeedInsights />
+      </>
     );
   }
 
   // Non autenticato
   if (!auth.isAuthenticated) {
-    return showRegister ? (
-      <RegisterView 
-        onRegister={auth.signUp}
-        onSwitchToLogin={() => setShowRegister(false)}
-      />
-    ) : (
-      <LoginView 
-        onLogin={auth.signIn}
-        onSwitchToRegister={() => setShowRegister(true)}
-      />
+    return (
+      <>
+        {showRegister ? (
+          <RegisterView 
+            onRegister={auth.signUp}
+            onSwitchToLogin={() => setShowRegister(false)}
+          />
+        ) : (
+          <LoginView 
+            onLogin={auth.signIn}
+            onSwitchToRegister={() => setShowRegister(true)}
+          />
+        )}
+        <SpeedInsights />
+      </>
     );
   }
 
   // Autenticato - mostra app principale
   return (
-    <div className="app-container">
-      <Navigation activeView={activeView} onNavigate={setActiveView} />
-      
-      <main className="main-content">
-        {activeView === 'calendar' && (
-          <CalendarView 
-            shifts={shifts}
-            companies={companies}
-            profile={auth.profile}
-          />
-        )}
+    <>
+      <div className="app-container">
+        <Navigation activeView={activeView} onNavigate={setActiveView} />
         
-        {activeView === 'summary' && (
-          <SummaryView 
-            shifts={shifts}
-            companies={companies}
-            profile={auth.profile}
-          />
-        )}
-        
-        {activeView === 'profile' && (
-          <ProfileView 
-            user={auth.user}
-            profile={auth.profile}
-            companies={companies}
-            onSignOut={auth.signOut}
-          />
-        )}
-      </main>
-    </div>
+        <main className="main-content">
+          {activeView === 'calendar' && (
+            <CalendarView 
+              shifts={shifts}
+              companies={companies}
+              profile={auth.profile}
+            />
+          )}
+          
+          {activeView === 'summary' && (
+            <SummaryView 
+              shifts={shifts}
+              companies={companies}
+              profile={auth.profile}
+            />
+          )}
+          
+          {activeView === 'profile' && (
+            <ProfileView 
+              user={auth.user}
+              profile={auth.profile}
+              companies={companies}
+              onSignOut={auth.signOut}
+            />
+          )}
+        </main>
+      </div>
+      <SpeedInsights />
+    </>
   );
 }
 
