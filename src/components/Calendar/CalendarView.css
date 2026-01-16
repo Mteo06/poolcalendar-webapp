@@ -219,3 +219,86 @@
   font-weight: 600;
 }
 
+.shifts-section {
+  margin-bottom: 32px;
+}
+
+.section-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: #333;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.past-section {
+  margin-top: 40px;
+  border-top: 2px solid #e0e0e0;
+  padding-top: 20px;
+}
+
+.past-shifts-toggle {
+  width: 100%;
+  padding: 16px 20px;
+  background: #f8f9fa;
+  border: 2px solid #e0e0e0;
+  border-radius: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #666;
+  transition: all 0.3s;
+  margin-bottom: 16px;
+}
+
+.past-shifts-toggle:hover {
+  background: #e9ecef;
+  border-color: #667eea;
+}
+
+.toggle-icon {
+  font-size: 14px;
+  color: #667eea;
+  transition: transform 0.3s;
+}
+
+.toggle-text {
+  flex: 1;
+}
+
+.past-shifts-content {
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.past-date-group {
+  opacity: 0.8;
+}
+
+.past-date {
+  color: #999 !important;
+}
+
+.past-shift-card {
+  opacity: 0.7;
+  border-color: #d0d0d0;
+}
+
+.past-shift-card:hover {
+  opacity: 1;
+}

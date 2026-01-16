@@ -4,13 +4,16 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.6);
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.7);
   display: flex;
-  align-items: center;
   justify-content: center;
-  z-index: 2000;
+  align-items: center;
+  z-index: 1000;
   padding: 20px;
-  animation: fadeIn 0.3s;
+  overflow-y: auto;
+  box-sizing: border-box; /* ← Importante */
 }
 
 @keyframes fadeIn {
@@ -25,8 +28,9 @@
   max-width: 500px;
   max-height: 90vh;
   overflow-y: auto;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-  animation: slideUp 0.3s;
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.3);
+  animation: modalSlideIn 0.3s ease-out;
+  box-sizing: border-box; /* ← Importante */
 }
 
 @keyframes slideUp {
@@ -208,5 +212,30 @@
   margin-top: 8px;
 }
 
+@media (max-width: 480px) {
+  .modal-overlay {
+    padding: 10px;
+    align-items: flex-start;
+  }
 
+  .modal-content {
+    margin: 10px 0;
+    max-width: 100%;
+    max-height: calc(100vh - 20px);
+    border-radius: 16px;
+  }
 
+  .modal-header {
+    padding: 16px;
+  }
+
+  .shift-form {
+    padding: 16px;
+  }
+
+  .form-group input,
+  .form-group select,
+  .form-group textarea {
+    font-size: 16px; /* ← Previene zoom su iOS */
+  }
+}

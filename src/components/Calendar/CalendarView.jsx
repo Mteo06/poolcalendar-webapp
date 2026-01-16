@@ -5,6 +5,7 @@ import './CalendarView.css';
 const CalendarView = ({ shifts, companies, profile }) => {
   const [selectedShift, setSelectedShift] = useState(null);
   const [showModal, setShowModal] = useState(false);
+  const [showPastShifts, setShowPastShifts] = useState(false);
 
   const handleShiftClick = (shift) => {
     setSelectedShift(shift);
@@ -23,23 +24,59 @@ const CalendarView = ({ shifts, companies, profile }) => {
     });
   };
 
-  const groupShiftsByDate = () => {
+  const formatDate = (date) => {
+    const d = new Date(date);
+    const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const isToday = d.toDateString() === today.toDateString();
+    const isTomorrow = d.toDateString() === tomorrow.toDateString();
+
+    if (isToday) return 'Oggi';
+    if (isTomorrow) return 'Domani';
+
+    return d.toLocaleDateString('it-IT', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long'
+    });
+  };
+
+  const groupShiftsByDate = (shiftsArray) => {
     const grouped = {};
-    const shiftsList = Array.isArray(shifts.shifts) ? shifts.shifts : [];
+    const now = new Date();
     
-    shiftsList.forEach(shift => {
-      const dateKey = new Date(shift.start_time).toLocaleDateString('it-IT');
+    shiftsArray.forEach(shift => {
+      const shiftDate = new Date(shift.start_time);
+      const dateKey = shiftDate.toISOString().split('T')[0]; // YYYY-MM-DD
+      
       if (!grouped[dateKey]) {
-        grouped[dateKey] = [];
+        grouped[dateKey] = {
+          date: shiftDate,
+          shifts: [],
+          isPast: shiftDate < now && shiftDate.toDateString() !== now.toDateString()
+        };
       }
-      grouped[dateKey].push(shift);
+      grouped[dateKey].shifts.push(shift);
     });
 
     return grouped;
   };
 
-  const groupedShifts = groupShiftsByDate();
   const shiftsList = Array.isArray(shifts.shifts) ? shifts.shifts : [];
+  const groupedShifts = groupShiftsByDate(shiftsList);
+  
+  // Separa turni futuri e passati
+  const futureShifts = Object.entries(groupedShifts)
+    .filter(([_, group]) => !group.isPast)
+    .sort((a, b) => new Date(a[0]) - new Date(b[0]));
+  
+  const pastShifts = Object.entries(groupedShifts)
+    .filter(([_, group]) => group.isPast)
+    .sort((a, b) => new Date(b[0]) - new Date(a[0])); // Più recenti prima
+
+  const pastShiftsCount = pastShifts.reduce((sum, [_, group]) => sum + group.shifts.length, 0);
 
   return (
     <div className="calendar-view">
@@ -60,58 +97,126 @@ const CalendarView = ({ shifts, companies, profile }) => {
         </div>
       ) : (
         <div className="shifts-list">
-          {Object.keys(groupedShifts).sort((a, b) => {
-            const dateA = a.split('/').reverse().join('-');
-            const dateB = b.split('/').reverse().join('-');
-            return new Date(dateA) - new Date(dateB);
-          }).map(dateKey => (
-            <div key={dateKey} className="date-group">
-              <h3 className="date-header">{dateKey}</h3>
-              
-              {groupedShifts[dateKey].map(shift => {
-                const company = companies.getCompanyById(shift.company_id);
-                
-                return (
-                  <div 
-                    key={shift.id} 
-                    className="shift-card"
-                    onClick={() => handleShiftClick(shift)}
-                  >
-                    <div className="shift-time">
-                      <span className="time-badge">{formatTime(shift.start_time)}</span>
-                      <span className="time-separator">→</span>
-                      <span className="time-badge">{formatTime(shift.end_time)}</span>
-                    </div>
-
-                    <div className="shift-details">
-                      {/* MOSTRA SOCIETÀ */}
-                      <div className="shift-row">
-                        <span className="shift-label">🏢 Società:</span>
-                        <span className="shift-company">{company?.name || 'N/A'}</span>
-                      </div>
-
-                      <div className="shift-row">
-                        <span className="shift-label">🏊 Impianto:</span>
-                        <span className="shift-value">{shift.facility}</span>
-                      </div>
-                      
-                      <div className="shift-row">
-                        <span className="shift-label">👔 Ruolo:</span>
-                        <span className="shift-role">{shift.role}</span>
-                      </div>
-
-                      {shift.break_duration > 0 && (
-                        <div className="shift-row">
-                          <span className="shift-label">☕ Pausa:</span>
-                          <span className="shift-value">{shift.break_duration} min</span>
+          {/* PROSSIMI TURNI */}
+          {futureShifts.length > 0 && (
+            <div className="shifts-section">
+              <h2 className="section-title">🔜 Prossimi Turni</h2>
+              {futureShifts.map(([dateKey, group]) => (
+                <div key={dateKey} className="date-group">
+                  <h3 className="date-header">{formatDate(group.date)}</h3>
+                  
+                  {group.shifts.map(shift => {
+                    const company = companies.getCompanyById(shift.company_id);
+                    
+                    return (
+                      <div 
+                        key={shift.id} 
+                        className="shift-card"
+                        onClick={() => handleShiftClick(shift)}
+                      >
+                        <div className="shift-time">
+                          <span className="time-badge">{formatTime(shift.start_time)}</span>
+                          <span className="time-separator">→</span>
+                          <span className="time-badge">{formatTime(shift.end_time)}</span>
                         </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
+
+                        <div className="shift-details">
+                          <div className="shift-row">
+                            <span className="shift-label">🏢 Società:</span>
+                            <span className="shift-company">{company?.name || 'N/A'}</span>
+                          </div>
+
+                          <div className="shift-row">
+                            <span className="shift-label">🏊 Impianto:</span>
+                            <span className="shift-value">{shift.facility}</span>
+                          </div>
+                          
+                          <div className="shift-row">
+                            <span className="shift-label">👔 Ruolo:</span>
+                            <span className="shift-role">{shift.role}</span>
+                          </div>
+
+                          {shift.break_duration > 0 && (
+                            <div className="shift-row">
+                              <span className="shift-label">☕ Pausa:</span>
+                              <span className="shift-value">{shift.break_duration} min</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
             </div>
-          ))}
+          )}
+
+          {/* TURNI PASSATI - COLLASSABILI */}
+          {pastShifts.length > 0 && (
+            <div className="shifts-section past-section">
+              <button 
+                className="past-shifts-toggle"
+                onClick={() => setShowPastShifts(!showPastShifts)}
+              >
+                <span className="toggle-icon">{showPastShifts ? '▼' : '▶'}</span>
+                <span className="toggle-text">
+                  Turni Passati ({pastShiftsCount})
+                </span>
+              </button>
+
+              {showPastShifts && (
+                <div className="past-shifts-content">
+                  {pastShifts.map(([dateKey, group]) => (
+                    <div key={dateKey} className="date-group past-date-group">
+                      <h3 className="date-header past-date">{formatDate(group.date)}</h3>
+                      
+                      {group.shifts.map(shift => {
+                        const company = companies.getCompanyById(shift.company_id);
+                        
+                        return (
+                          <div 
+                            key={shift.id} 
+                            className="shift-card past-shift-card"
+                            onClick={() => handleShiftClick(shift)}
+                          >
+                            <div className="shift-time">
+                              <span className="time-badge">{formatTime(shift.start_time)}</span>
+                              <span className="time-separator">→</span>
+                              <span className="time-badge">{formatTime(shift.end_time)}</span>
+                            </div>
+
+                            <div className="shift-details">
+                              <div className="shift-row">
+                                <span className="shift-label">🏢 Società:</span>
+                                <span className="shift-company">{company?.name || 'N/A'}</span>
+                              </div>
+
+                              <div className="shift-row">
+                                <span className="shift-label">🏊 Impianto:</span>
+                                <span className="shift-value">{shift.facility}</span>
+                              </div>
+                              
+                              <div className="shift-row">
+                                <span className="shift-label">👔 Ruolo:</span>
+                                <span className="shift-role">{shift.role}</span>
+                              </div>
+
+                              {shift.break_duration > 0 && (
+                                <div className="shift-row">
+                                  <span className="shift-label">☕ Pausa:</span>
+                                  <span className="shift-value">{shift.break_duration} min</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 

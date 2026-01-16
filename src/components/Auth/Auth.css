@@ -219,3 +219,23 @@
     gap: 10px !important;
   }
 }
+
+.auth-link-button {
+  background: none;
+  border: none;
+  color: #667eea;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 8px;
+  text-decoration: underline;
+  transition: color 0.3s;
+}
+
+.auth-link-button:hover {
+  color: #5568d3;
+}
+
+.auth-link-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
