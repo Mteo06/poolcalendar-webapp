@@ -1,118 +1,108 @@
 import React, { useState } from 'react';
-import './Auth.css';
+import '../Auth/Auth.css';
 
 const RegisterView = ({ onRegister, onSwitchToLogin }) => {
-  const [formData, setFormData] = useState({
-    username: '',
-    email: '',
-    password: '',
-    confirmPassword: ''
-  });
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-  const [needsEmailConfirm, setNeedsEmailConfirm] = useState(false);
+  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    setSuccess('');
 
-    if (formData.password !== formData.confirmPassword) {
-      setError('Le password non corrispondono');
-      return;
-    }
-
-    if (formData.password.length < 6) {
+    if (password.length < 6) {
       setError('La password deve essere almeno 6 caratteri');
       return;
     }
 
-    setLoading(true);
-    const result = await onRegister(formData.email, formData.password, formData.username);
-    
-    if (result.success) {
-      if (result.needsEmailConfirmation) {
-        setSuccess('Registrazione completata! Controlla la tua email per confermare l\'account.');
-        setNeedsEmailConfirm(true);
-      } else {
-        setSuccess('Registrazione completata! Accesso in corso...');
-      }
-    } else {
-      setError(result.error || 'Errore durante la registrazione');
+    if (password !== confirmPassword) {
+      setError('Le password non corrispondono');
+      return;
     }
-    setLoading(false);
-  };
 
-  if (needsEmailConfirm) {
-    return (
-      <div className="auth-container">
-        <div className="auth-card">
-          <h1 className="auth-title">📧 Conferma Email</h1>
-          <div className="email-confirm-message">
-            <p>Abbiamo inviato un'email a:</p>
-            <p className="email-highlight">{formData.email}</p>
-            <p>Clicca sul link nell'email per confermare il tuo account.</p>
-            <p className="note">Non hai ricevuto l'email? Controlla la cartella spam.</p>
-          </div>
-          <button 
-            onClick={onSwitchToLogin} 
-            className="auth-button primary"
-          >
-            Vai al Login
-          </button>
-        </div>
-      </div>
-    );
-  }
+    setLoading(true);
+
+    const result = await onRegister(email, password, username);
+    
+    if (!result.success) {
+      setError(result.error);
+      setLoading(false);
+    }
+    // Se success, App.jsx gestirà il redirect alla schermata di conferma email
+  };
 
   return (
     <div className="auth-container">
       <div className="auth-card">
-        <h1 className="auth-title">PoolCalendar</h1>
-        <h2 className="auth-subtitle">Registrazione</h2>
-        <form onSubmit={handleSubmit} className="auth-form">
+        <h1 className="auth-title">🏊‍♂️ PoolCalendar</h1>
+        <p className="auth-subtitle">Crea il tuo account</p>
+
+        <form className="auth-form" onSubmit={handleSubmit}>
+          {error && <div className="auth-error">{error}</div>}
+
           <input
             type="text"
-            placeholder="Username"
-            value={formData.username}
-            onChange={(e) => setFormData({...formData, username: e.target.value})}
-            required
             className="auth-input"
+            placeholder="Username"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            required
+            disabled={loading}
+            autoComplete="username"
+            name="username"
           />
+
           <input
             type="email"
+            className="auth-input"
             placeholder="Email"
-            value={formData.email}
-            onChange={(e) => setFormData({...formData, email: e.target.value})}
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
             required
-            className="auth-input"
+            disabled={loading}
+            autoComplete="email"
+            name="email"
           />
+
           <input
             type="password"
+            className="auth-input"
             placeholder="Password (min. 6 caratteri)"
-            value={formData.password}
-            onChange={(e) => setFormData({...formData, password: e.target.value})}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
             required
-            className="auth-input"
+            disabled={loading}
+            autoComplete="new-password"
+            name="password"
           />
+
           <input
             type="password"
-            placeholder="Conferma Password"
-            value={formData.confirmPassword}
-            onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})}
-            required
             className="auth-input"
+            placeholder="Conferma Password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            required
+            disabled={loading}
+            autoComplete="new-password"
+            name="confirmPassword"
           />
-          {error && <p className="auth-error">{error}</p>}
-          {success && <p className="auth-success">{success}</p>}
-          <button type="submit" disabled={loading} className="auth-button primary">
-            {loading ? 'Registrazione...' : 'Registrati'}
+
+          <button 
+            type="submit" 
+            className="auth-button primary"
+            disabled={loading}
+          >
+            {loading ? 'Registrazione in corso...' : 'Registrati'}
           </button>
+
           <button
             type="button"
-            onClick={onSwitchToLogin}
             className="auth-button secondary"
+            onClick={onSwitchToLogin}
             disabled={loading}
           >
             Hai già un account? Accedi

@@ -39,7 +39,7 @@ const LoginView = ({ onLogin, onSwitchToRegister }) => {
     try {
       const { supabase } = await import('../../lib/supabaseClient');
       const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
-        redirectTo: `${window.location.origin}/reset-password`
+        redirectTo: window.location.origin
       });
 
       if (error) throw error;
@@ -77,6 +77,8 @@ const LoginView = ({ onLogin, onSwitchToRegister }) => {
               onChange={(e) => setResetEmail(e.target.value)}
               required
               disabled={loading}
+              autoComplete="email"
+              name="email"
             />
 
             <button 
@@ -122,6 +124,8 @@ const LoginView = ({ onLogin, onSwitchToRegister }) => {
             onChange={(e) => setEmail(e.target.value)}
             required
             disabled={loading}
+            autoComplete="email"
+            name="email"
           />
 
           <input
@@ -132,6 +136,8 @@ const LoginView = ({ onLogin, onSwitchToRegister }) => {
             onChange={(e) => setPassword(e.target.value)}
             required
             disabled={loading}
+            autoComplete="current-password"
+            name="password"
           />
 
           <label className="remember-me">
@@ -140,6 +146,7 @@ const LoginView = ({ onLogin, onSwitchToRegister }) => {
               checked={rememberMe}
               onChange={(e) => setRememberMe(e.target.checked)}
               disabled={loading}
+              name="remember"
             />
             Rimani connesso
           </label>
