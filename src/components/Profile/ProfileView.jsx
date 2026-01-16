@@ -1,12 +1,12 @@
-import React, { useState } from 'react';
-import { supabase } from '../../lib/supabaseClient';
+import React, { useState, useEffect } from 'react';
 import CompanyModal from './CompanyModal';
 import './ProfileView.css';
 
 const ProfileView = ({ user, profile, companies, onSignOut }) => {
   const [isEditingEmail, setIsEditingEmail] = useState(false);
   const [isEditingPassword, setIsEditingPassword] = useState(false);
-  const [isEditingUsername, setIsEditingUsername] = useState(false); 
+  const [isEditingUsername, setIsEditingUsername] = useState(false);
+  const [isEditingCertificates, setIsEditingCertificates] = useState(false);
   const [showCompanyModal, setShowCompanyModal] = useState(false);
   const [selectedCompany, setSelectedCompany] = useState(null);
   
@@ -23,7 +23,31 @@ const ProfileView = ({ user, profile, companies, onSignOut }) => {
     newUsername: profile?.username || ''
   });
 
+  const [certificatesData, setCertificatesData] = useState({
+    blsd_expiry: profile?.blsd_expiry || '',
+    ab_license_expiry: profile?.ab_license_expiry || '',
+    medical_cert_expiry: profile?.medical_cert_expiry || ''
+  });
+
   const [message, setMessage] = useState({ type: '', text: '' });
+
+  // Aggiorna stati quando profile cambia
+  useEffect(() => {
+    if (profile) {
+      setUsernameData({ newUsername: profile.username || '' });
+      setCertificatesData({
+        blsd_expiry: profile.blsd_expiry || '',
+        ab_license_expiry: profile.ab_license_expiry || '',
+        medical_cert_expiry: profile.medical_cert_expiry || ''
+      });
+    }
+  }, [profile]);
+
+  useEffect(() => {
+    if (user) {
+      setEmailData({ newEmail: user.email || '' });
+    }
+  }, [user]);
 
   const handleUpdateUsername = async (e) => {
     e.preventDefault();
@@ -45,7 +69,6 @@ const ProfileView = ({ user, profile, companies, onSignOut }) => {
       setMessage({ type: 'success', text: 'Username aggiornato con successo!' });
       setIsEditingUsername(false);
       
-      // Ricarica la pagina per aggiornare il profilo
       setTimeout(() => {
         window.location.reload();
       }, 1500);
@@ -57,16 +80,21 @@ const ProfileView = ({ user, profile, companies, onSignOut }) => {
   const handleUpdateEmail = async (e) => {
     e.preventDefault();
     
+    if (!emailData.newEmail || emailData.newEmail === user.email) {
+      setMessage({ type: 'error', text: 'Inserisci una nuova email valida' });
+      return;
+    }
+
     try {
+      const { supabase } = await import('../../lib/supabaseClient');
       const { error } = await supabase.auth.updateUser({
         email: emailData.newEmail
       });
 
       if (error) throw error;
 
-      setMessage({ type: 'success', text: 'Email aggiornata! Controlla la tua nuova email per confermare.' });
+      setMessage({ type: 'success', text: 'Email aggiornata! Controlla la tua casella per confermare.' });
       setIsEditingEmail(false);
-      setTimeout(() => setMessage({ type: '', text: '' }), 5000);
     } catch (error) {
       setMessage({ type: 'error', text: error.message });
     }
@@ -74,18 +102,19 @@ const ProfileView = ({ user, profile, companies, onSignOut }) => {
 
   const handleUpdatePassword = async (e) => {
     e.preventDefault();
+    
+    if (passwordData.newPassword.length < 6) {
+      setMessage({ type: 'error', text: 'La password deve essere almeno 6 caratteri' });
+      return;
+    }
 
     if (passwordData.newPassword !== passwordData.confirmPassword) {
       setMessage({ type: 'error', text: 'Le password non corrispondono' });
       return;
     }
 
-    if (passwordData.newPassword.length < 6) {
-      setMessage({ type: 'error', text: 'La password deve essere almeno 6 caratteri' });
-      return;
-    }
-
     try {
+      const { supabase } = await import('../../lib/supabaseClient');
       const { error } = await supabase.auth.updateUser({
         password: passwordData.newPassword
       });
@@ -95,24 +124,51 @@ const ProfileView = ({ user, profile, companies, onSignOut }) => {
       setMessage({ type: 'success', text: 'Password aggiornata con successo!' });
       setIsEditingPassword(false);
       setPasswordData({ newPassword: '', confirmPassword: '' });
-      setTimeout(() => setMessage({ type: '', text: '' }), 3000);
     } catch (error) {
       setMessage({ type: 'error', text: error.message });
     }
   };
 
-  const handleToggleActive = async (companyId) => {
-    const result = await companies.toggleCompanyActive(companyId);
-    if (result.success) {
-      const company = companies.companies.find(c => c.id === companyId);
-      const newStatus = !company.is_active;
-      setMessage({ 
-        type: 'success', 
-        text: `${company.name} ${newStatus ? 'attivata' : 'disattivata'}!` 
-      });
-      setTimeout(() => setMessage({ type: '', text: '' }), 3000);
+  const handleUpdateCertificates = async (e) => {
+    e.preventDefault();
+    
+    try {
+      const { supabase } = await import('../../lib/supabaseClient');
+      const { error } = await supabase
+        .from('user_profiles')
+        .update({
+          blsd_expiry: certificatesData.blsd_expiry || null,
+          ab_license_expiry: certificatesData.ab_license_expiry || null,
+          medical_cert_expiry: certificatesData.medical_cert_expiry || null
+        })
+        .eq('id', user.id);
+
+      if (error) throw error;
+
+      setMessage({ type: 'success', text: 'Certificati aggiornati con successo!' });
+      setIsEditingCertificates(false);
+      
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
+    } catch (error) {
+      setMessage({ type: 'error', text: error.message });
+    }
+  };
+
+  const getCertificateStatus = (expiryDate) => {
+    if (!expiryDate) return null;
+    
+    const today = new Date();
+    const expiry = new Date(expiryDate);
+    const daysUntilExpiry = Math.ceil((expiry - today) / (1000 * 60 * 60 * 24));
+    
+    if (daysUntilExpiry < 0) {
+      return { status: 'expired', message: 'Scaduto', class: 'cert-expired' };
+    } else if (daysUntilExpiry <= 30) {
+      return { status: 'expiring', message: `Scade tra ${daysUntilExpiry} giorni`, class: 'cert-expiring' };
     } else {
-      setMessage({ type: 'error', text: 'Errore durante l\'operazione' });
+      return { status: 'valid', message: 'Valido', class: 'cert-valid' };
     }
   };
 
@@ -124,6 +180,29 @@ const ProfileView = ({ user, profile, companies, onSignOut }) => {
   const handleAddCompany = () => {
     setSelectedCompany(null);
     setShowCompanyModal(true);
+  };
+
+  const handleArchiveCompany = async (companyId) => {
+    if (!window.confirm('Sei sicuro di voler archiviare questa società?')) {
+      return;
+    }
+
+    try {
+      const { supabase } = await import('../../lib/supabaseClient');
+      const { error } = await supabase
+        .from('companies')
+        .update({ is_active: false })
+        .eq('id', companyId)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      await companies.refreshCompanies();
+      setMessage({ type: 'success', text: 'Società archiviata con successo!' });
+      setTimeout(() => setMessage({ type: '', text: '' }), 3000);
+    } catch (error) {
+      setMessage({ type: 'error', text: error.message });
+    }
   };
 
   return (
@@ -141,7 +220,7 @@ const ProfileView = ({ user, profile, companies, onSignOut }) => {
         <h2>Informazioni Account</h2>
         
         <div className="profile-info">
-          {/* ← NUOVO: Sezione Username */}
+          {/* Username */}
           <div className="info-row">
             <span className="info-label">👤 Username:</span>
             {isEditingUsername ? (
@@ -180,7 +259,7 @@ const ProfileView = ({ user, profile, companies, onSignOut }) => {
             )}
           </div>
 
-          {/* Email - ESISTENTE */}
+          {/* Email */}
           <div className="info-row">
             <span className="info-label">📧 Email:</span>
             {isEditingEmail ? (
@@ -219,18 +298,11 @@ const ProfileView = ({ user, profile, companies, onSignOut }) => {
         </div>
       </div>
 
-      {/* Modifica Password */}
+      {/* Sicurezza */}
       <div className="profile-section">
         <h2>Sicurezza</h2>
         
-        {!isEditingPassword ? (
-          <button 
-            className="btn-primary"
-            onClick={() => setIsEditingPassword(true)}
-          >
-            Modifica Password
-          </button>
-        ) : (
+        {isEditingPassword ? (
           <form onSubmit={handleUpdatePassword} className="password-form">
             <div className="form-group">
               <label>Nuova Password</label>
@@ -239,7 +311,9 @@ const ProfileView = ({ user, profile, companies, onSignOut }) => {
                 value={passwordData.newPassword}
                 onChange={(e) => setPasswordData({...passwordData, newPassword: e.target.value})}
                 placeholder="Almeno 6 caratteri"
+                className="form-input"
                 required
+                minLength={6}
               />
             </div>
 
@@ -250,12 +324,15 @@ const ProfileView = ({ user, profile, companies, onSignOut }) => {
                 value={passwordData.confirmPassword}
                 onChange={(e) => setPasswordData({...passwordData, confirmPassword: e.target.value})}
                 placeholder="Ripeti la password"
+                className="form-input"
                 required
               />
             </div>
 
             <div className="form-actions">
-              <button type="submit" className="btn-primary">Salva Password</button>
+              <button type="submit" className="btn-primary">
+                Aggiorna Password
+              </button>
               <button 
                 type="button" 
                 className="btn-secondary"
@@ -268,144 +345,222 @@ const ProfileView = ({ user, profile, companies, onSignOut }) => {
               </button>
             </div>
           </form>
+        ) : (
+          <button 
+            className="btn-secondary"
+            onClick={() => setIsEditingPassword(true)}
+          >
+            🔒 Cambia Password
+          </button>
         )}
       </div>
 
-      {/* Società - CON TOGGLE ATTIVA/DISATTIVA */}
+      {/* Certificati e Brevetti */}
       <div className="profile-section">
         <div className="section-header">
-          <h2>Gestione Società</h2>
+          <h2>📋 Certificati e Brevetti</h2>
+          {!isEditingCertificates && (
+            <button 
+              className="btn-edit-small"
+              onClick={() => setIsEditingCertificates(true)}
+            >
+              ✏️ Modifica
+            </button>
+          )}
+        </div>
+
+        {isEditingCertificates ? (
+          <form onSubmit={handleUpdateCertificates} className="certificates-form">
+            <div className="cert-form-group">
+              <label>🚑 BLSD - Scadenza</label>
+              <input
+                type="date"
+                value={certificatesData.blsd_expiry}
+                onChange={(e) => setCertificatesData({...certificatesData, blsd_expiry: e.target.value})}
+                className="cert-input"
+              />
+            </div>
+
+            <div className="cert-form-group">
+              <label>🏊 Brevetto AB - Scadenza</label>
+              <input
+                type="date"
+                value={certificatesData.ab_license_expiry}
+                onChange={(e) => setCertificatesData({...certificatesData, ab_license_expiry: e.target.value})}
+                className="cert-input"
+              />
+            </div>
+
+            <div className="cert-form-group">
+              <label>🩺 Certificato Medico - Scadenza</label>
+              <input
+                type="date"
+                value={certificatesData.medical_cert_expiry}
+                onChange={(e) => setCertificatesData({...certificatesData, medical_cert_expiry: e.target.value})}
+                className="cert-input"
+              />
+            </div>
+
+            <div className="form-actions">
+              <button type="submit" className="btn-primary">
+                Salva Certificati
+              </button>
+              <button 
+                type="button" 
+                className="btn-secondary"
+                onClick={() => {
+                  setIsEditingCertificates(false);
+                  setCertificatesData({
+                    blsd_expiry: profile?.blsd_expiry || '',
+                    ab_license_expiry: profile?.ab_license_expiry || '',
+                    medical_cert_expiry: profile?.medical_cert_expiry || ''
+                  });
+                }}
+              >
+                Annulla
+              </button>
+            </div>
+          </form>
+        ) : (
+          <div className="certificates-list">
+            {/* BLSD */}
+            <div className="certificate-item">
+              <div className="cert-icon">🚑</div>
+              <div className="cert-details">
+                <h4>BLSD</h4>
+                {profile?.blsd_expiry ? (
+                  <>
+                    <p className="cert-date">
+                      Scadenza: {new Date(profile.blsd_expiry).toLocaleDateString('it-IT', {
+                        day: '2-digit',
+                        month: 'long',
+                        year: 'numeric'
+                      })}
+                    </p>
+                    {getCertificateStatus(profile.blsd_expiry) && (
+                      <span className={`cert-status ${getCertificateStatus(profile.blsd_expiry).class}`}>
+                        {getCertificateStatus(profile.blsd_expiry).message}
+                      </span>
+                    )}
+                  </>
+                ) : (
+                  <p className="cert-not-set">Non impostato</p>
+                )}
+              </div>
+            </div>
+
+            {/* Brevetto AB */}
+            <div className="certificate-item">
+              <div className="cert-icon">🏊</div>
+              <div className="cert-details">
+                <h4>Brevetto AB</h4>
+                {profile?.ab_license_expiry ? (
+                  <>
+                    <p className="cert-date">
+                      Scadenza: {new Date(profile.ab_license_expiry).toLocaleDateString('it-IT', {
+                        day: '2-digit',
+                        month: 'long',
+                        year: 'numeric'
+                      })}
+                    </p>
+                    {getCertificateStatus(profile.ab_license_expiry) && (
+                      <span className={`cert-status ${getCertificateStatus(profile.ab_license_expiry).class}`}>
+                        {getCertificateStatus(profile.ab_license_expiry).message}
+                      </span>
+                    )}
+                  </>
+                ) : (
+                  <p className="cert-not-set">Non impostato</p>
+                )}
+              </div>
+            </div>
+
+            {/* Certificato Medico */}
+            <div className="certificate-item">
+              <div className="cert-icon">🩺</div>
+              <div className="cert-details">
+                <h4>Certificato Medico</h4>
+                {profile?.medical_cert_expiry ? (
+                  <>
+                    <p className="cert-date">
+                      Scadenza: {new Date(profile.medical_cert_expiry).toLocaleDateString('it-IT', {
+                        day: '2-digit',
+                        month: 'long',
+                        year: 'numeric'
+                      })}
+                    </p>
+                    {getCertificateStatus(profile.medical_cert_expiry) && (
+                      <span className={`cert-status ${getCertificateStatus(profile.medical_cert_expiry).class}`}>
+                        {getCertificateStatus(profile.medical_cert_expiry).message}
+                      </span>
+                    )}
+                  </>
+                ) : (
+                  <p className="cert-not-set">Non impostato</p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Gestione Società */}
+      <div className="profile-section">
+        <div className="section-header">
+          <h2>🏢 Società</h2>
           <button className="btn-add" onClick={handleAddCompany}>
-            + Aggiungi Società
+            + Aggiungi
           </button>
         </div>
 
-        <div className="companies-info">
-          <p className="info-text">
-            💡 Puoi avere più società contemporaneamente. Attiva quelle che usi regolarmente.
-          </p>
-        </div>
-
-        <div className="companies-list">
-          {companies.companies.map(company => (
-            <div 
-              key={company.id} 
-              className={`company-card ${company.is_active ? 'active' : 'inactive'}`}
-            >
-              <div className="company-header">
-                <div className="company-title-row">
+        {companies.loading ? (
+          <p>Caricamento società...</p>
+        ) : companies.activeCompanies.length === 0 ? (
+          <div className="empty-state-small">
+            <p>Nessuna società configurata</p>
+            <button className="btn-primary" onClick={handleAddCompany}>
+              Aggiungi la tua prima società
+            </button>
+          </div>
+        ) : (
+          <div className="companies-list">
+            {companies.activeCompanies.map(company => (
+              <div key={company.id} className="company-card">
+                <div className="company-info">
                   <h3>{company.name}</h3>
-                  {company.is_default && (
-                    <span className="default-badge">Default</span>
-                  )}
+                  <p className="company-details">
+                    {Object.keys(company.roles || {}).length} ruoli • 
+                    {company.facilities?.length || 0} impianti
+                  </p>
                 </div>
-                
-                {/* TOGGLE ATTIVA/DISATTIVA */}
-                <div className="company-toggle">
-                  <label className="toggle-switch">
-                    <input
-                      type="checkbox"
-                      checked={company.is_active}
-                      onChange={() => handleToggleActive(company.id)}
-                    />
-                    <span className="toggle-slider"></span>
-                  </label>
-                  <span className="toggle-label">
-                    {company.is_active ? 'Attiva' : 'Disattivata'}
-                  </span>
+                <div className="company-actions">
+                  <button 
+                    className="btn-edit-icon"
+                    onClick={() => handleEditCompany(company)}
+                  >
+                    ✏️
+                  </button>
+                  <button 
+                    className="btn-archive-icon"
+                    onClick={() => handleArchiveCompany(company.id)}
+                  >
+                    🗑️
+                  </button>
                 </div>
               </div>
-
-              {/* Mostra dettagli solo se attiva */}
-              {company.is_active && (
-                <>
-                  <div className="company-roles">
-                    {Object.entries(company.roles || {}).map(([role, data]) => (
-                      <div key={role} className="role-item">
-                        <span className="role-name">{role}:</span>
-                        <span className="role-rate">€{data.hourly_rate?.toFixed(2)}/h</span>
-                      </div>
-                    ))}
-                  </div>
-
-                  {company.facilities && company.facilities.length > 0 && (
-                    <div className="company-facilities">
-                      <span className="facilities-label">🏊 Impianti:</span>
-                      <div className="facilities-tags">
-                        {company.facilities.slice(0, 3).map((facility, idx) => (
-                          <span key={idx} className="facility-tag">{facility}</span>
-                        ))}
-                        {company.facilities.length > 3 && (
-                          <span className="facility-tag">+{company.facilities.length - 3}</span>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="company-actions">
-                    <button 
-                      className="btn-edit-small"
-                      onClick={() => handleEditCompany(company)}
-                    >
-                      ✏️ Modifica
-                    </button>
-                    
-                    {!company.is_default && (
-                      <button 
-                        className="btn-delete-small"
-                        onClick={async () => {
-                          if (window.confirm(`Eliminare ${company.name}? Tutti i turni associati rimarranno ma senza società.`)) {
-                            await companies.deleteCompany(company.id);
-                            setMessage({ type: 'success', text: 'Società eliminata' });
-                            setTimeout(() => setMessage({ type: '', text: '' }), 3000);
-                          }
-                        }}
-                      >
-                        🗑️ Elimina
-                      </button>
-                    )}
-                  </div>
-                </>
-              )}
-
-              {/* Messaggio quando disattivata */}
-              {!company.is_active && (
-                <div className="company-inactive-message">
-                  <span>⏸️ Società disattivata. Attivala per usarla nei turni.</span>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-
-        {/* Statistiche società */}
-        <div className="companies-stats">
-          <div className="stat-item">
-            <span className="stat-icon">📊</span>
-            <span className="stat-label">Totali:</span>
-            <span className="stat-value">{companies.companies.length}</span>
+            ))}
           </div>
-          <div className="stat-item">
-            <span className="stat-icon">✅</span>
-            <span className="stat-label">Attive:</span>
-            <span className="stat-value">{companies.activeCompanies.length}</span>
-          </div>
-          <div className="stat-item">
-            <span className="stat-icon">⏸️</span>
-            <span className="stat-label">Disattivate:</span>
-            <span className="stat-value">{companies.companies.length - companies.activeCompanies.length}</span>
-          </div>
-        </div>
+        )}
       </div>
 
       {/* Logout */}
       <div className="profile-section">
-        <h2>Sessione</h2>
         <button className="btn-logout" onClick={onSignOut}>
-          🚪 Disconnetti
+          🚪 Esci
         </button>
       </div>
 
+      {/* Company Modal */}
       {showCompanyModal && (
         <CompanyModal
           company={selectedCompany}
