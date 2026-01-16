@@ -113,43 +113,46 @@ const LoginView = ({ onLogin, onSwitchToRegister }) => {
         <h1 className="auth-title">🏊‍♂️ PoolCalendar</h1>
         <p className="auth-subtitle">Bentornato!</p>
 
-        <form className="auth-form" onSubmit={handleSubmit}>
-          {error && <div className="auth-error">{error}</div>}
+       <form className="auth-form" onSubmit={handleSubmit} autoComplete="on">
+        {error && <div className="auth-error">{error}</div>}
 
+        <input
+          type="email"
+          id="email"
+          name="email"
+          className="auth-input"
+          placeholder="Email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+          disabled={loading}
+          autoComplete="email"
+        />
+
+        <input
+          type="password"
+          id="password"
+          name="password"
+          className="auth-input"
+          placeholder="Password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+          disabled={loading}
+          autoComplete="current-password"
+        />
+
+        <label className="remember-me">
           <input
-            type="email"
-            className="auth-input"
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
+            type="checkbox"
+            id="remember"
+            name="remember"
+            checked={rememberMe}
+            onChange={(e) => setRememberMe(e.target.checked)}
             disabled={loading}
-            autoComplete="email"
-            name="email"
           />
-
-          <input
-            type="password"
-            className="auth-input"
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            disabled={loading}
-            autoComplete="current-password"
-            name="password"
-          />
-
-          <label className="remember-me">
-            <input
-              type="checkbox"
-              checked={rememberMe}
-              onChange={(e) => setRememberMe(e.target.checked)}
-              disabled={loading}
-              name="remember"
-            />
-            Rimani connesso
-          </label>
+          Rimani connesso
+        </label>
 
           <button 
             type="submit" 

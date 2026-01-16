@@ -6,6 +6,7 @@ import './ProfileView.css';
 const ProfileView = ({ user, profile, companies, onSignOut }) => {
   const [isEditingEmail, setIsEditingEmail] = useState(false);
   const [isEditingPassword, setIsEditingPassword] = useState(false);
+  const [isEditingUsername, setIsEditingUsername] = useState(false); 
   const [showCompanyModal, setShowCompanyModal] = useState(false);
   const [selectedCompany, setSelectedCompany] = useState(null);
   
@@ -18,7 +19,40 @@ const ProfileView = ({ user, profile, companies, onSignOut }) => {
     confirmPassword: ''
   });
 
+  const [usernameData, setUsernameData] = useState({
+    newUsername: profile?.username || ''
+  });
+
   const [message, setMessage] = useState({ type: '', text: '' });
+
+  const handleUpdateUsername = async (e) => {
+    e.preventDefault();
+    
+    if (!usernameData.newUsername || usernameData.newUsername.length < 3) {
+      setMessage({ type: 'error', text: 'Lo username deve essere almeno 3 caratteri' });
+      return;
+    }
+
+    try {
+      const { supabase } = await import('../../lib/supabaseClient');
+      const { error } = await supabase
+        .from('user_profiles')
+        .update({ username: usernameData.newUsername })
+        .eq('id', user.id);
+
+      if (error) throw error;
+
+      setMessage({ type: 'success', text: 'Username aggiornato con successo!' });
+      setIsEditingUsername(false);
+      
+      // Ricarica la pagina per aggiornare il profilo
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
+    } catch (error) {
+      setMessage({ type: 'error', text: error.message });
+    }
+  };
 
   const handleUpdateEmail = async (e) => {
     e.preventDefault();
@@ -107,11 +141,46 @@ const ProfileView = ({ user, profile, companies, onSignOut }) => {
         <h2>Informazioni Account</h2>
         
         <div className="profile-info">
+          {/* ← NUOVO: Sezione Username */}
           <div className="info-row">
             <span className="info-label">👤 Username:</span>
-            <span className="info-value">{profile?.username || 'N/A'}</span>
+            {isEditingUsername ? (
+              <form onSubmit={handleUpdateUsername} className="inline-form">
+                <input
+                  type="text"
+                  value={usernameData.newUsername}
+                  onChange={(e) => setUsernameData({ newUsername: e.target.value })}
+                  className="inline-input"
+                  required
+                  minLength={3}
+                  placeholder="Almeno 3 caratteri"
+                />
+                <button type="submit" className="btn-save-inline">Salva</button>
+                <button 
+                  type="button" 
+                  className="btn-cancel-inline"
+                  onClick={() => {
+                    setIsEditingUsername(false);
+                    setUsernameData({ newUsername: profile?.username || '' });
+                  }}
+                >
+                  Annulla
+                </button>
+              </form>
+            ) : (
+              <>
+                <span className="info-value">{profile?.username || 'N/A'}</span>
+                <button 
+                  className="btn-edit"
+                  onClick={() => setIsEditingUsername(true)}
+                >
+                  Modifica
+                </button>
+              </>
+            )}
           </div>
 
+          {/* Email - ESISTENTE */}
           <div className="info-row">
             <span className="info-label">📧 Email:</span>
             {isEditingEmail ? (
