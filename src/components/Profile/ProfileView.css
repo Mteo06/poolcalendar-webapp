@@ -810,7 +810,7 @@ input:checked + .toggle-slider:before {
   cursor: pointer;
   transition: all 0.3s;
   white-space: nowrap;
-  align-self: flex-start; /* ← Importante per non allungarsi */
+  flex-shrink: 0; /* ← Cambia da align-self a flex-shrink */
 }
 
 .btn-edit-small:hover {
@@ -818,6 +818,7 @@ input:checked + .toggle-slider:before {
   transform: translateY(-1px);
   box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
 }
+
 
 
 /* Responsive certificati */

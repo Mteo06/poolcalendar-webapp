@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
+import { supabase } from '../../lib/supabaseClient';
 import CompanyModal from './CompanyModal';
 import './ProfileView.css';
+
 
 const ProfileView = ({ user, profile, companies, onSignOut }) => {
   const [isEditingEmail, setIsEditingEmail] = useState(false);
   const [isEditingPassword, setIsEditingPassword] = useState(false);
+  const [isEditingUsername, setIsEditingUsername] = useState(false); 
   const [showCompanyModal, setShowCompanyModal] = useState(false);
   const [selectedCompany, setSelectedCompany] = useState(null);
   
@@ -17,6 +20,10 @@ const ProfileView = ({ user, profile, companies, onSignOut }) => {
     confirmPassword: ''
   });
 
+  const [usernameData, setUsernameData] = useState({
+    newUsername: profile?.username || ''
+  });
+
   const [message, setMessage] = useState({ type: '', text: '' });
 
   // NUOVO: Stati per certificati
@@ -27,7 +34,7 @@ const ProfileView = ({ user, profile, companies, onSignOut }) => {
     medical_cert_expiry: profile?.medical_cert_expiry || ''
   });
 
-  // NUOVO: useEffect per certificati
+  // NUOVO: useEffect per aggiornare certificati quando profile cambia
   useEffect(() => {
     if (profile) {
       setCertificatesData({
@@ -38,30 +45,47 @@ const ProfileView = ({ user, profile, companies, onSignOut }) => {
     }
   }, [profile]);
 
-  useEffect(() => {
-    if (user) {
-      setEmailData({ newEmail: user.email || '' });
-    }
-  }, [user]);
-
-  const handleUpdateEmail = async (e) => {
+  const handleUpdateUsername = async (e) => {
     e.preventDefault();
     
-    if (!emailData.newEmail || emailData.newEmail === user.email) {
-      setMessage({ type: 'error', text: 'Inserisci una nuova email valida' });
+    if (!usernameData.newUsername || usernameData.newUsername.length < 3) {
+      setMessage({ type: 'error', text: 'Lo username deve essere almeno 3 caratteri' });
       return;
     }
 
     try {
       const { supabase } = await import('../../lib/supabaseClient');
+      const { error } = await supabase
+        .from('user_profiles')
+        .update({ username: usernameData.newUsername })
+        .eq('id', user.id);
+
+      if (error) throw error;
+
+      setMessage({ type: 'success', text: 'Username aggiornato con successo!' });
+      setIsEditingUsername(false);
+      
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
+    } catch (error) {
+      setMessage({ type: 'error', text: error.message });
+    }
+  };
+
+  const handleUpdateEmail = async (e) => {
+    e.preventDefault();
+    
+    try {
       const { error } = await supabase.auth.updateUser({
         email: emailData.newEmail
       });
 
       if (error) throw error;
 
-      setMessage({ type: 'success', text: 'Email aggiornata! Controlla la tua casella per confermare.' });
+      setMessage({ type: 'success', text: 'Email aggiornata! Controlla la tua nuova email per confermare.' });
       setIsEditingEmail(false);
+      setTimeout(() => setMessage({ type: '', text: '' }), 5000);
     } catch (error) {
       setMessage({ type: 'error', text: error.message });
     }
@@ -69,19 +93,18 @@ const ProfileView = ({ user, profile, companies, onSignOut }) => {
 
   const handleUpdatePassword = async (e) => {
     e.preventDefault();
-    
-    if (passwordData.newPassword.length < 6) {
-      setMessage({ type: 'error', text: 'La password deve essere almeno 6 caratteri' });
-      return;
-    }
 
     if (passwordData.newPassword !== passwordData.confirmPassword) {
       setMessage({ type: 'error', text: 'Le password non corrispondono' });
       return;
     }
 
+    if (passwordData.newPassword.length < 6) {
+      setMessage({ type: 'error', text: 'La password deve essere almeno 6 caratteri' });
+      return;
+    }
+
     try {
-      const { supabase } = await import('../../lib/supabaseClient');
       const { error } = await supabase.auth.updateUser({
         password: passwordData.newPassword
       });
@@ -91,6 +114,7 @@ const ProfileView = ({ user, profile, companies, onSignOut }) => {
       setMessage({ type: 'success', text: 'Password aggiornata con successo!' });
       setIsEditingPassword(false);
       setPasswordData({ newPassword: '', confirmPassword: '' });
+      setTimeout(() => setMessage({ type: '', text: '' }), 3000);
     } catch (error) {
       setMessage({ type: 'error', text: error.message });
     }
@@ -101,7 +125,6 @@ const ProfileView = ({ user, profile, companies, onSignOut }) => {
     e.preventDefault();
     
     try {
-      const { supabase } = await import('../../lib/supabaseClient');
       const { error } = await supabase
         .from('user_profiles')
         .update({
@@ -141,6 +164,21 @@ const ProfileView = ({ user, profile, companies, onSignOut }) => {
     }
   };
 
+  const handleToggleActive = async (companyId) => {
+    const result = await companies.toggleCompanyActive(companyId);
+    if (result.success) {
+      const company = companies.companies.find(c => c.id === companyId);
+      const newStatus = !company.is_active;
+      setMessage({ 
+        type: 'success', 
+        text: `${company.name} ${newStatus ? 'attivata' : 'disattivata'}!` 
+      });
+      setTimeout(() => setMessage({ type: '', text: '' }), 3000);
+    } else {
+      setMessage({ type: 'error', text: 'Errore durante l\'operazione' });
+    }
+  };
+
   const handleEditCompany = (company) => {
     setSelectedCompany(company);
     setShowCompanyModal(true);
@@ -149,29 +187,6 @@ const ProfileView = ({ user, profile, companies, onSignOut }) => {
   const handleAddCompany = () => {
     setSelectedCompany(null);
     setShowCompanyModal(true);
-  };
-
-  const handleArchiveCompany = async (companyId) => {
-    if (!window.confirm('Sei sicuro di voler archiviare questa società?')) {
-      return;
-    }
-
-    try {
-      const { supabase } = await import('../../lib/supabaseClient');
-      const { error } = await supabase
-        .from('companies')
-        .update({ is_active: false })
-        .eq('id', companyId)
-        .eq('user_id', user.id);
-
-      if (error) throw error;
-
-      await companies.refreshCompanies();
-      setMessage({ type: 'success', text: 'Società archiviata con successo!' });
-      setTimeout(() => setMessage({ type: '', text: '' }), 3000);
-    } catch (error) {
-      setMessage({ type: 'error', text: error.message });
-    }
   };
 
   return (
@@ -191,7 +206,40 @@ const ProfileView = ({ user, profile, companies, onSignOut }) => {
         <div className="profile-info">
           <div className="info-row">
             <span className="info-label">👤 Username:</span>
-            <span className="info-value">{profile?.username || 'N/A'}</span>
+            {isEditingUsername ? (
+              <form onSubmit={handleUpdateUsername} className="inline-form">
+                <input
+                  type="text"
+                  value={usernameData.newUsername}
+                  onChange={(e) => setUsernameData({ newUsername: e.target.value })}
+                  className="inline-input"
+                  required
+                  minLength={3}
+                  placeholder="Almeno 3 caratteri"
+                />
+                <button type="submit" className="btn-save-inline">Salva</button>
+                <button 
+                  type="button" 
+                  className="btn-cancel-inline"
+                  onClick={() => {
+                    setIsEditingUsername(false);
+                    setUsernameData({ newUsername: profile?.username || '' });
+                  }}
+                >
+                  Annulla
+                </button>
+              </form>
+            ) : (
+              <>
+                <span className="info-value">{profile?.username || 'N/A'}</span>
+                <button 
+                  className="btn-edit"
+                  onClick={() => setIsEditingUsername(true)}
+                >
+                  Modifica
+                </button>
+              </>
+            )}
           </div>
 
           <div className="info-row">
@@ -232,11 +280,18 @@ const ProfileView = ({ user, profile, companies, onSignOut }) => {
         </div>
       </div>
 
-      {/* Sicurezza */}
+      {/* Modifica Password */}
       <div className="profile-section">
         <h2>Sicurezza</h2>
         
-        {isEditingPassword ? (
+        {!isEditingPassword ? (
+          <button 
+            className="btn-primary"
+            onClick={() => setIsEditingPassword(true)}
+          >
+            Modifica Password
+          </button>
+        ) : (
           <form onSubmit={handleUpdatePassword} className="password-form">
             <div className="form-group">
               <label>Nuova Password</label>
@@ -245,9 +300,7 @@ const ProfileView = ({ user, profile, companies, onSignOut }) => {
                 value={passwordData.newPassword}
                 onChange={(e) => setPasswordData({...passwordData, newPassword: e.target.value})}
                 placeholder="Almeno 6 caratteri"
-                className="form-input"
                 required
-                minLength={6}
               />
             </div>
 
@@ -258,15 +311,12 @@ const ProfileView = ({ user, profile, companies, onSignOut }) => {
                 value={passwordData.confirmPassword}
                 onChange={(e) => setPasswordData({...passwordData, confirmPassword: e.target.value})}
                 placeholder="Ripeti la password"
-                className="form-input"
                 required
               />
             </div>
 
             <div className="form-actions">
-              <button type="submit" className="btn-primary">
-                Aggiorna Password
-              </button>
+              <button type="submit" className="btn-primary">Salva Password</button>
               <button 
                 type="button" 
                 className="btn-secondary"
@@ -279,28 +329,21 @@ const ProfileView = ({ user, profile, companies, onSignOut }) => {
               </button>
             </div>
           </form>
-        ) : (
-          <button 
-            className="btn-secondary"
-            onClick={() => setIsEditingPassword(true)}
-          >
-            🔒 Cambia Password
-          </button>
         )}
       </div>
 
       {/* NUOVO: Certificati e Brevetti */}
       <div className="profile-section">
-        <div className="section-header">
-          <h2>📋 Certificati e Brevetti</h2>
-          {!isEditingCertificates && (
-            <button 
-              className="btn-edit-small"
-              onClick={() => setIsEditingCertificates(true)}
-            >
-              ✏️ Modifica
-            </button>
-          )}
+  <div className="section-header">
+    <h2>📋 Certificati e Brevetti</h2>
+    {!isEditingCertificates && (
+      <button 
+        className="btn-add"
+        onClick={() => setIsEditingCertificates(true)}
+      >
+        ✏️ Modifica  {/* ← Aggiungi emoji per renderlo più simile agli altri */}
+      </button>
+    )}
         </div>
 
         {isEditingCertificates ? (
@@ -438,63 +481,138 @@ const ProfileView = ({ user, profile, companies, onSignOut }) => {
         )}
       </div>
 
-      {/* Gestione Società */}
+      {/* Società - CON TOGGLE ATTIVA/DISATTIVA */}
       <div className="profile-section">
         <div className="section-header">
-          <h2>🏢 Società</h2>
+          <h2>Gestione Società</h2>
           <button className="btn-add" onClick={handleAddCompany}>
-            + Aggiungi
+            + Aggiungi Società
           </button>
         </div>
 
-        {companies.loading ? (
-          <p>Caricamento società...</p>
-        ) : companies.activeCompanies.length === 0 ? (
-          <div className="empty-state-small">
-            <p>Nessuna società configurata</p>
-            <button className="btn-primary" onClick={handleAddCompany}>
-              Aggiungi la tua prima società
-            </button>
-          </div>
-        ) : (
-          <div className="companies-list">
-            {companies.activeCompanies.map(company => (
-              <div key={company.id} className="company-card">
-                <div className="company-info">
+        <div className="companies-info">
+          <p className="info-text">
+            💡 Puoi avere più società contemporaneamente. Attiva quelle che usi regolarmente.
+          </p>
+        </div>
+
+        <div className="companies-list">
+          {companies.companies.map(company => (
+            <div 
+              key={company.id} 
+              className={`company-card ${company.is_active ? 'active' : 'inactive'}`}
+            >
+              <div className="company-header">
+                <div className="company-title-row">
                   <h3>{company.name}</h3>
-                  <p className="company-details">
-                    {Object.keys(company.roles || {}).length} ruoli • 
-                    {company.facilities?.length || 0} impianti
-                  </p>
+                  {company.is_default && (
+                    <span className="default-badge">Default</span>
+                  )}
                 </div>
-                <div className="company-actions">
-                  <button 
-                    className="btn-edit-icon"
-                    onClick={() => handleEditCompany(company)}
-                  >
-                    ✏️
-                  </button>
-                  <button 
-                    className="btn-archive-icon"
-                    onClick={() => handleArchiveCompany(company.id)}
-                  >
-                    🗑️
-                  </button>
+                
+                <div className="company-toggle">
+                  <label className="toggle-switch">
+                    <input
+                      type="checkbox"
+                      checked={company.is_active}
+                      onChange={() => handleToggleActive(company.id)}
+                    />
+                    <span className="toggle-slider"></span>
+                  </label>
+                  <span className="toggle-label">
+                    {company.is_active ? 'Attiva' : 'Disattivata'}
+                  </span>
                 </div>
               </div>
-            ))}
+
+              {company.is_active && (
+                <>
+                  <div className="company-roles">
+                    {Object.entries(company.roles || {}).map(([role, data]) => (
+                      <div key={role} className="role-item">
+                        <span className="role-name">{role}:</span>
+                        <span className="role-rate">€{data.hourly_rate?.toFixed(2)}/h</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {company.facilities && company.facilities.length > 0 && (
+                    <div className="company-facilities">
+                      <span className="facilities-label">🏊 Impianti:</span>
+                      <div className="facilities-tags">
+                        {company.facilities.slice(0, 3).map((facility, idx) => (
+                          <span key={idx} className="facility-tag">{facility}</span>
+                        ))}
+                        {company.facilities.length > 3 && (
+                          <span className="facility-tag">+{company.facilities.length - 3}</span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="company-actions">
+                    <button 
+                      className="btn-edit-small"
+                      onClick={() => handleEditCompany(company)}
+                    >
+                      ✏️ Modifica
+                    </button>
+                    
+                    {!company.is_default && (
+                      <button 
+                        className="btn-delete-small"
+                        onClick={async () => {
+                          if (window.confirm(`Eliminare ${company.name}? Tutti i turni associati rimarranno ma senza società.`)) {
+                            await companies.deleteCompany(company.id);
+                            setMessage({ type: 'success', text: 'Società eliminata' });
+                            setTimeout(() => setMessage({ type: '', text: '' }), 3000);
+                          }
+                        }}
+                      >
+                        🗑️ Elimina
+                      </button>
+                    )}
+                  </div>
+                </>
+              )}
+
+              {!company.is_active && (
+                <div className="company-inactive-message">
+                  <span>⏸️ Società disattivata. Attivala per usarla nei turni.</span>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        <div className="companies-stats">
+          <div className="stat-item">
+            <span className="stat-icon">📊</span>
+            <span className="stat-label">Totali:</span>
+            <span className="stat-value">{companies.companies.length}</span>
           </div>
-        )}
+          <div className="stat-item">
+            <span className="stat-icon">✅</span>
+            <span className="stat-label">Attive:</span>
+            <span className="stat-value">{companies.activeCompanies.length}</span>
+          </div>
+          <div className="stat-item">
+            <span className="stat-icon">⏸️</span>
+            <span className="stat-label">Disattivate:</span>
+            <span className="stat-value">{companies.companies.length - companies.activeCompanies.length}</span>
+          </div>
+        </div>
       </div>
 
       {/* Logout */}
-      <div className="profile-section">
-        <button className="btn-logout" onClick={onSignOut}>
-          🚪 Esci
-        </button>
-      </div>
 
-      {/* Company Modal */}
+        <div className="profile-section">
+          <button className="btn-logout" onClick={onSignOut}>
+            🚪 Esci
+          </button>
+        </div>
+
+
       {showCompanyModal && (
         <CompanyModal
           company={selectedCompany}
