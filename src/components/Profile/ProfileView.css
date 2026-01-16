@@ -698,3 +698,130 @@ input:checked + .toggle-slider:before {
     font-size: 28px;
   }
 }
+
+/* Certificati */
+.certificates-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.cert-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cert-form-group label {
+  font-size: 15px;
+  font-weight: 600;
+  color: #333;
+}
+
+.cert-input {
+  padding: 12px;
+  border: 2px solid #e0e0e0;
+  border-radius: 10px;
+  font-size: 16px;
+  transition: border-color 0.3s;
+}
+
+.cert-input:focus {
+  outline: none;
+  border-color: #667eea;
+}
+
+.certificates-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.certificate-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 20px;
+  background: #f8f9fa;
+  border-radius: 12px;
+  border-left: 4px solid #667eea;
+}
+
+.cert-icon {
+  font-size: 32px;
+  flex-shrink: 0;
+}
+
+.cert-details {
+  flex: 1;
+}
+
+.cert-details h4 {
+  font-size: 16px;
+  font-weight: 700;
+  color: #333;
+  margin: 0 0 8px 0;
+}
+
+.cert-date {
+  font-size: 14px;
+  color: #666;
+  margin: 0 0 8px 0;
+}
+
+.cert-not-set {
+  font-size: 14px;
+  color: #999;
+  font-style: italic;
+  margin: 0;
+}
+
+.cert-status {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.cert-valid {
+  background: #d4edda;
+  color: #155724;
+}
+
+.cert-expiring {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.cert-expired {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.btn-edit-small {
+  background: #667eea;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.btn-edit-small:hover {
+  background: #5568d3;
+  transform: translateY(-1px);
+}
+
+/* Responsive certificati */
+@media (max-width: 768px) {
+  .certificate-item {
+    padding: 16px;
+  }
+
+  .cert-icon {
+    font-size: 28px;
+  }
+}
