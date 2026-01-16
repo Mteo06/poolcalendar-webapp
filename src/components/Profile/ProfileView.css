@@ -806,14 +806,19 @@ input:checked + .toggle-slider:before {
   padding: 8px 16px;
   border-radius: 8px;
   font-size: 14px;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.3s;
+  white-space: nowrap;
+  align-self: flex-start; /* ← Importante per non allungarsi */
 }
 
 .btn-edit-small:hover {
   background: #5568d3;
   transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
 }
+
 
 /* Responsive certificati */
 @media (max-width: 768px) {
