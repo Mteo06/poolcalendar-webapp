@@ -3,7 +3,6 @@ import { supabase } from '../../lib/supabaseClient';
 import CompanyModal from './CompanyModal';
 import './ProfileView.css';
 
-
 const ProfileView = ({ user, profile, companies, onSignOut }) => {
   const [isEditingEmail, setIsEditingEmail] = useState(false);
   const [isEditingPassword, setIsEditingPassword] = useState(false);
@@ -26,7 +25,7 @@ const ProfileView = ({ user, profile, companies, onSignOut }) => {
 
   const [message, setMessage] = useState({ type: '', text: '' });
 
-  // NUOVO: Stati per certificati
+  // Certificati
   const [isEditingCertificates, setIsEditingCertificates] = useState(false);
   const [certificatesData, setCertificatesData] = useState({
     blsd_expiry: profile?.blsd_expiry || '',
@@ -34,7 +33,6 @@ const ProfileView = ({ user, profile, companies, onSignOut }) => {
     medical_cert_expiry: profile?.medical_cert_expiry || ''
   });
 
-  // NUOVO: useEffect per aggiornare certificati quando profile cambia
   useEffect(() => {
     if (profile) {
       setCertificatesData({
@@ -42,9 +40,13 @@ const ProfileView = ({ user, profile, companies, onSignOut }) => {
         ab_license_expiry: profile.ab_license_expiry || '',
         medical_cert_expiry: profile.medical_cert_expiry || ''
       });
+      setUsernameData({
+        newUsername: profile.username || ''
+      });
     }
   }, [profile]);
 
+  // AGGIORNAMENTO USERNAME: tabella giusta + niente reload
   const handleUpdateUsername = async (e) => {
     e.preventDefault();
     
@@ -54,20 +56,22 @@ const ProfileView = ({ user, profile, companies, onSignOut }) => {
     }
 
     try {
-      const { supabase } = await import('../../lib/supabaseClient');
-      const { error } = await supabase
-        .from('user_profiles')
+      const { data, error } = await supabase
+        .from('userprofiles')      // <-- nome tabella allineato a useAuth
         .update({ username: usernameData.newUsername })
-        .eq('id', user.id);
+        .eq('id', user.id)
+        .select()
+        .single();
 
       if (error) throw error;
 
       setMessage({ type: 'success', text: 'Username aggiornato con successo!' });
       setIsEditingUsername(false);
-      
-      setTimeout(() => {
-        window.location.reload();
-      }, 1500);
+
+      // Aggiorna il profilo in memoria se viene passato come prop mutabile
+      if (profile) {
+        profile.username = data.username;
+      }
     } catch (error) {
       setMessage({ type: 'error', text: error.message });
     }
@@ -120,34 +124,37 @@ const ProfileView = ({ user, profile, companies, onSignOut }) => {
     }
   };
 
-  // NUOVO: Funzione per aggiornare certificati
+  // Aggiornamento certificati: tabella giusta + niente reload
   const handleUpdateCertificates = async (e) => {
     e.preventDefault();
     
     try {
-      const { error } = await supabase
-        .from('user_profiles')
+      const { data, error } = await supabase
+        .from('userprofiles')   // <-- stesso nome tabella
         .update({
           blsd_expiry: certificatesData.blsd_expiry || null,
           ab_license_expiry: certificatesData.ab_license_expiry || null,
           medical_cert_expiry: certificatesData.medical_cert_expiry || null
         })
-        .eq('id', user.id);
+        .eq('id', user.id)
+        .select()
+        .single();
 
       if (error) throw error;
 
       setMessage({ type: 'success', text: 'Certificati aggiornati con successo!' });
       setIsEditingCertificates(false);
-      
-      setTimeout(() => {
-        window.location.reload();
-      }, 1500);
+
+      if (profile) {
+        profile.blsd_expiry = data.blsd_expiry;
+        profile.ab_license_expiry = data.ab_license_expiry;
+        profile.medical_cert_expiry = data.medical_cert_expiry;
+      }
     } catch (error) {
       setMessage({ type: 'error', text: error.message });
     }
   };
 
-  // NUOVO: Funzione per controllare stato certificato
   const getCertificateStatus = (expiryDate) => {
     if (!expiryDate) return null;
     
@@ -280,7 +287,7 @@ const ProfileView = ({ user, profile, companies, onSignOut }) => {
         </div>
       </div>
 
-      {/* Modifica Password */}
+      {/* Sicurezza */}
       <div className="profile-section">
         <h2>Sicurezza</h2>
         
@@ -332,18 +339,18 @@ const ProfileView = ({ user, profile, companies, onSignOut }) => {
         )}
       </div>
 
-      {/* NUOVO: Certificati e Brevetti */}
+      {/* Certificati e Brevetti */}
       <div className="profile-section">
-  <div className="section-header">
-    <h2>📋 Certificati e Brevetti</h2>
-    {!isEditingCertificates && (
-      <button 
-        className="btn-add"
-        onClick={() => setIsEditingCertificates(true)}
-      >
-        ✏️ Modifica  {/* ← Aggiungi emoji per renderlo più simile agli altri */}
-      </button>
-    )}
+        <div className="section-header">
+          <h2>📋 Certificati e Brevetti</h2>
+          {!isEditingCertificates && (
+            <button 
+              className="btn-add"
+              onClick={() => setIsEditingCertificates(true)}
+            >
+              + Modifica
+            </button>
+          )}
         </div>
 
         {isEditingCertificates ? (
@@ -481,7 +488,7 @@ const ProfileView = ({ user, profile, companies, onSignOut }) => {
         )}
       </div>
 
-      {/* Società - CON TOGGLE ATTIVA/DISATTIVA */}
+      {/* Società */}
       <div className="profile-section">
         <div className="section-header">
           <h2>Gestione Società</h2>
@@ -605,13 +612,11 @@ const ProfileView = ({ user, profile, companies, onSignOut }) => {
       </div>
 
       {/* Logout */}
-
-        <div className="profile-section">
-          <button className="btn-logout" onClick={onSignOut}>
-            🚪 Esci
-          </button>
-        </div>
-
+      <div className="profile-section">
+        <button className="btn-logout" onClick={onSignOut}>
+          🚪 Esci
+        </button>
+      </div>
 
       {showCompanyModal && (
         <CompanyModal

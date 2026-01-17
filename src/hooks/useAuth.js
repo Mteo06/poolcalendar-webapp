@@ -16,33 +16,46 @@ export const useAuth = () => {
 
     const createProfile = async (userId) => {
       try {
-        const { data: { user: currentUser } } = await supabase.auth.getUser();
-
-        const newProfile = {
-          id: userId,
-          username: currentUser?.user_metadata?.username || currentUser?.email?.split('@')[0] || 'utente',
-          email: currentUser?.email || '',
-          name: '',
-          surname: ''
-        };
-
+        console.log("Creazione profilo manuale per", userId);
+    
+        const { data: userData } = await supabase.auth.getUser();
+        const currentUser = userData?.user;
+    
+        const usernameFromMeta =
+          currentUser?.user_metadata?.username ||
+          currentUser?.email?.split("@")[0];   // fallback sensato
+    
         const { data, error } = await supabase
-          .from('user_profiles')
-          .insert([newProfile])
+          .from("userprofiles")
+          .insert({
+            id: userId,
+            username: usernameFromMeta,
+            email: currentUser?.email,
+            name: "",
+            surname: "",
+          })
           .select()
           .single();
-
+    
         if (data) {
-          setSafeState(setProfile, data);
-        } else if (error) {
-          console.error('❌ Error creating profile:', error);
+          console.log("Profilo creato:", data);
+          setProfile(data);
+        } else {
+          console.error("Errore creazione profilo:", error);
+          // fallback comunque coerente
+          setProfile({
+            id: userId,
+            username: usernameFromMeta,
+            email: currentUser?.email,
+            name: "",
+            surname: "",
+          });
         }
       } catch (err) {
-        console.error('💥 Exception in createProfile:', err);
-      } finally {
-        setSafeState(setLoading, false);
+        console.error("Errore creazione profilo:", err);
       }
     };
+    
 
     const fetchProfile = async (userId) => {
       try {
@@ -133,13 +146,17 @@ export const useAuth = () => {
         email,
         password,
         options: {
-          data: { username },
-          emailRedirectTo: window.location.origin
-        }
+          data: { username },             // <-- username finisce in user_metadata
+          emailRedirectTo: window.location.origin,
+        },
       });
+  
       if (error) throw error;
+  
+      console.log("Registrazione completata", data);
       return { success: true, data, needsEmailConfirmation: !data.session };
     } catch (error) {
+      console.error("Errore registrazione:", error);
       return { success: false, error: error.message };
     }
   };
