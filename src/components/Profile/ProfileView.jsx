@@ -348,7 +348,7 @@ const ProfileView = ({ user, profile, companies, onSignOut }) => {
               className="btn-add"
               onClick={() => setIsEditingCertificates(true)}
             >
-              + Modifica
+              ✏️ Modifica
             </button>
           )}
         </div>

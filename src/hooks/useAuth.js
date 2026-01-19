@@ -26,7 +26,7 @@ export const useAuth = () => {
           currentUser?.email?.split("@")[0];   // fallback sensato
     
         const { data, error } = await supabase
-          .from("userprofiles")
+          .from("user_profiles")  
           .insert({
             id: userId,
             username: usernameFromMeta,
@@ -36,7 +36,7 @@ export const useAuth = () => {
           })
           .select()
           .single();
-    
+
         if (data) {
           console.log("Profilo creato:", data);
           setProfile(data);
@@ -50,6 +50,7 @@ export const useAuth = () => {
             name: "",
             surname: "",
           });
+
         }
       } catch (err) {
         console.error("Errore creazione profilo:", err);
@@ -60,10 +61,11 @@ export const useAuth = () => {
     const fetchProfile = async (userId) => {
       try {
         const { data, error, status } = await supabase
-          .from('user_profiles')
-          .select('*')
-          .eq('id', userId)
-          .single();
+        .from('user_profiles')  
+        .select('*')
+        .eq('id', userId)
+        .single();
+
 
         if (data) {
           setSafeState(setProfile, data);
