@@ -57,7 +57,7 @@ const ProfileView = ({ user, profile, companies, onSignOut }) => {
 
     try {
       const { data, error } = await supabase
-        .from('userprofiles')      // <-- nome tabella allineato a useAuth
+        .from('user_profiles')      // <-- nome tabella allineato a useAuth
         .update({ username: usernameData.newUsername })
         .eq('id', user.id)
         .select()
@@ -130,7 +130,7 @@ const ProfileView = ({ user, profile, companies, onSignOut }) => {
     
     try {
       const { data, error } = await supabase
-        .from('userprofiles')   // <-- stesso nome tabella
+        .from('user_profiles')   // <-- stesso nome tabella
         .update({
           blsd_expiry: certificatesData.blsd_expiry || null,
           ab_license_expiry: certificatesData.ab_license_expiry || null,
