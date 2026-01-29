@@ -509,22 +509,34 @@ const ProfileView = ({ user, profile, companies, onSignOut }) => {
         <div className="calendar-export-actions">
           <button 
             className="btn-export-profile" 
-            onClick={() => {
-              const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-              const userId = profile?.id;
-              const token = profile?.ical_token;
-              const url = `https://${supabaseUrl.replace('https://', '')}/functions/v1/ical-export?user=${userId}&token=${token}`;
-              navigator.clipboard.writeText(url);
-              
-              // Mostra feedback
-              const btn = document.activeElement;
-              const originalText = btn.textContent;
-              btn.textContent = '✅ Link copiato!';
-              setTimeout(() => btn.textContent = originalText, 2000);
+            onClick={async () => {
+              try {
+                const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+                const userId = profile?.id;
+                const token = profile?.ical_token;
+                const url = `https://${supabaseUrl.replace('https://', '')}/functions/v1/ical-export?user=${userId}&token=${token}`;
+                
+                await navigator.clipboard.writeText(url);
+                
+                // ✅ FIX: Mostra feedback senza cambiare pagina
+                const btn = event.target.closest('button');
+                const originalText = btn.innerHTML;
+                btn.innerHTML = '✅ Link copiato!';
+                btn.disabled = true;
+                
+                setTimeout(() => {
+                  btn.innerHTML = originalText;
+                  btn.disabled = false;
+                }, 2000);
+              } catch (err) {
+                console.error('Errore copia link:', err);
+                alert('Errore nella copia del link');
+              }
             }}
           >
             🔗 Copia Link Calendario
           </button>
+
 
           <a 
             href={`webcal://${import.meta.env.VITE_SUPABASE_URL.replace('https://', '')}/functions/v1/ical-export?user=${profile?.id}&token=${profile?.ical_token}`}
