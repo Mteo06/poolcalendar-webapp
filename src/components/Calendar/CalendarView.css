@@ -713,13 +713,19 @@
 }
 
 @media (max-width: 768px) {
-  .calendar-header h1 {
-    font-size: 26px;
+  .calendar-header {
+    flex-direction: column;
+    align-items: stretch;
   }
 
-  .add-shift-btn {
+  .calendar-header h1 {
+    font-size: 26px;
+    text-align: center;
+  }
+
+  .header-actions {
     width: 100%;
-    padding: 14px;
+    flex-direction: column;
   }
 
   .view-toggle {
@@ -731,55 +737,77 @@
     flex: 1;
   }
 
+  .add-shift-btn {
+    width: 100%;
+    padding: 14px;
+  }
+
+  /* ✅ FIX: Calendar grid mobile */
   .calendar-grid-view {
-    padding: 16px;
+    padding: 12px;
+    overflow-x: hidden;
+  }
+
+  .month-title {
+    font-size: 18px;
   }
 
   .calendar-grid {
-    gap: 4px;
-  }
-
-  .calendar-day {
-    min-height: 80px;
-    padding: 6px;
+    gap: 2px;
+    width: 100%;
   }
 
   .calendar-header-day {
-    padding: 8px 0;
-    font-size: 12px;
-  }
-
-  .day-number {
-    font-size: 13px;
-    margin-bottom: 6px;
-  }
-
-  .day-shift-item {
-    padding: 4px 6px;
-    font-size: 9px;
-  }
-
-  .shift-time-mini {
-    font-size: 9px;
-  }
-
-  .shift-role-mini {
+    padding: 6px 2px;
     font-size: 10px;
   }
 
-  .shift-facility-mini {
+  .calendar-day {
+    min-height: 70px;
+    padding: 4px;
+  }
+
+  .day-number {
+    font-size: 12px;
+    margin-bottom: 4px;
+  }
+
+  .day-shift-item {
+    padding: 3px 4px;
+    font-size: 8px;
+    gap: 1px;
+  }
+
+  .shift-time-mini {
+    font-size: 8px;
+  }
+
+  .shift-role-mini {
     font-size: 9px;
   }
 
+  .shift-facility-mini {
+    font-size: 8px;
+  }
+
+  .more-shifts-badge {
+    font-size: 8px;
+    padding: 3px 6px;
+  }
+
+  .day-shifts {
+    gap: 2px;
+  }
+
   .nav-btn {
-    width: 36px;
-    height: 36px;
-    font-size: 16px;
+    width: 32px;
+    height: 32px;
+    font-size: 14px;
   }
 
   .today-btn {
-    padding: 6px 16px;
-    font-size: 13px;
+    padding: 6px 12px;
+    font-size: 12px;
   }
 
   .date-group {
@@ -818,21 +846,80 @@
     font-size: 22px;
   }
 
-  .calendar-day {
-    min-height: 70px;
-    padding: 4px;
+  /* ✅ FIX: Extra small screens */
+  .calendar-grid-view {
+    padding: 8px;
   }
 
-  .day-number {
+  .month-navigation {
+    margin-bottom: 12px;
+  }
+
+  .month-title {
+    font-size: 16px;
+  }
+
+  .nav-btn {
+    width: 28px;
+    height: 28px;
     font-size: 12px;
   }
 
+  .today-btn {
+    padding: 5px 10px;
+    font-size: 11px;
+    margin-bottom: 12px;
+  }
+
+  .calendar-grid {
+    gap: 1px;
+  }
+
+  .calendar-header-day {
+    padding: 4px 0;
+    font-size: 9px;
+    border-radius: 4px;
+  }
+
+  .calendar-day {
+    min-height: 60px;
+    padding: 3px;
+    border-width: 1px;
+    border-radius: 6px;
+  }
+
+  .day-number {
+    font-size: 11px;
+    margin-bottom: 3px;
+  }
+
   .day-shift-item {
-    padding: 3px 4px;
+    padding: 2px 3px;
+    font-size: 7px;
+    border-radius: 4px;
+  }
+
+  .shift-time-mini {
+    font-size: 7px;
+  }
+
+  .shift-role-mini {
+    font-size: 8px;
+  }
+
+  .shift-facility-mini {
+    display: none; /* ✅ Nascondi impianto su schermi molto piccoli */
+  }
+
+  .more-shifts-badge {
+    font-size: 7px;
+    padding: 2px 4px;
+    margin-top: 2px;
   }
 
   .day-shifts {
-    max-height: 50px;
+    max-height: 45px;
+    gap: 1px;
   }
 
   .date-group {
@@ -848,7 +935,75 @@
     padding: 5px 10px;
   }
 
+  .day-modal-header {
+    padding: 16px;
+  }
+
+  .day-modal-header h2 {
+    font-size: 16px;
+  }
+
+  .close-btn {
+    width: 32px;
+    height: 32px;
+    font-size: 24px;
+  }
+
+  .day-modal-body {
+    padding: 12px;
+  }
+
+  .day-modal-footer {
+    padding: 12px;
+  }
+
+  .time-badge-large {
+    font-size: 13px;
+    padding: 5px 10px;
+  }
+
+  .day-shift-role-badge {
+    font-size: 12px;
+    padding: 5px 10px;
+  }
+}
+
+/* ✅ NUOVO: Extra extra small (iPhone SE, piccoli Android) */
+@media (max-width: 375px) {
+  .calendar-grid-view {
+    padding: 6px;
+  }
+
   .month-title {
-    font-size: 18px;
+    font-size: 14px;
+  }
+
+  .calendar-day {
+    min-height: 55px;
+    padding: 2px;
+  }
+
+  .day-number {
+    font-size: 10px;
+  }
+
+  .calendar-header-day {
+    font-size: 8px;
+    padding: 3px 0;
+  }
+
+  .day-shift-item {
+    font-size: 6px;
+    padding: 2px;
+  }
+
+  .shift-time-mini,
+  .shift-role-mini {
+    font-size: 7px;
+  }
+
+  .more-shifts-badge {
+    font-size: 6px;
+    padding: 2px 3px;
   }
 }
