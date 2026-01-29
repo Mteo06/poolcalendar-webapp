@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import CompanyModal from './CompanyModal';
 import './ProfileView.css';
+import { downloadICS } from '../../utils/icalExport';
+
 
 
 const ProfileView = ({ user, profile, companies, onSignOut }) => {
@@ -531,28 +533,48 @@ const ProfileView = ({ user, profile, companies, onSignOut }) => {
             📅 Aggiungi a Google/Apple Calendar
           </a>
 
-          <button 
-            className="btn-export-profile secondary" 
-            onClick={async () => {
-              // Carica turni e scarica
-              const { data: shifts } = await supabase
+        <button 
+          className="btn-export-profile secondary" 
+          onClick={async () => {
+            try {
+              // Importa supabase
+              const { supabase } = await import('../../lib/supabaseClient');
+              
+              // Carica turni
+              const { data: shifts, error } = await supabase
                 .from('shifts')
                 .select('*')
-                .eq('user_id', user.id)
+                .eq('user_id', profile.id)
                 .order('start_time', { ascending: true });
               
-              if (shifts) {
-                const formattedShifts = shifts.map(s => ({
-                  ...s,
-                  start_time: new Date(s.start_time),
-                  end_time: new Date(s.end_time)
-                }));
-                downloadICS(formattedShifts);
+              if (error) {
+                console.error('Errore caricamento turni:', error);
+                alert('Errore nel caricamento dei turni: ' + error.message);
+                return;
               }
-            }}
-          >
-            💾 Scarica File iCal
-          </button>
+
+              if (!shifts || shifts.length === 0) {
+                alert('Nessun turno da esportare');
+                return;
+              }
+              
+              // Converti le date da stringa a Date object
+              const formattedShifts = shifts.map(shift => ({
+                ...shift,
+                start_time: new Date(shift.start_time),
+                end_time: new Date(shift.end_time)
+              }));
+              
+              // Scarica iCal
+              downloadICS(formattedShifts);
+            } catch (err) {
+              console.error('Errore export completo:', err);
+              alert('Errore durante l\'export: ' + err.message);
+            }
+          }}
+        >
+          💾 Scarica File iCal
+        </button>
         </div>
 
         <div className="export-instructions">
