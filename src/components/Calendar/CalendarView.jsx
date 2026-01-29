@@ -1,11 +1,27 @@
 import React, { useState } from 'react';
 import ShiftModal from './ShiftModal';
 import './CalendarView.css';
+import { downloadICS } from '../../utils/icalExport';
 
 const CalendarView = ({ shifts, companies, profile }) => {
   const [selectedShift, setSelectedShift] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [showPastShifts, setShowPastShifts] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const getICalURL = () => {
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const userId = profile?.id;
+    const token = profile?.ical_token;
+    
+    return `webcal://${supabaseUrl.replace('https://', '')}/functions/v1/ical-export?user=${userId}&token=${token}`;
+  };
+
+  const copyICalLink = () => {
+    navigator.clipboard.writeText(getICalURL().replace('webcal://', 'https://'));
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   const handleShiftClick = (shift) => {
     setSelectedShift(shift);
@@ -49,7 +65,7 @@ const CalendarView = ({ shifts, companies, profile }) => {
     
     shiftsArray.forEach(shift => {
       const shiftDate = new Date(shift.start_time);
-      const dateKey = shiftDate.toISOString().split('T')[0]; // YYYY-MM-DD
+      const dateKey = shiftDate.toISOString().split('T')[0];
       
       if (!grouped[dateKey]) {
         grouped[dateKey] = {
@@ -67,14 +83,13 @@ const CalendarView = ({ shifts, companies, profile }) => {
   const shiftsList = Array.isArray(shifts.shifts) ? shifts.shifts : [];
   const groupedShifts = groupShiftsByDate(shiftsList);
   
-  // Separa turni futuri e passati
   const futureShifts = Object.entries(groupedShifts)
     .filter(([_, group]) => !group.isPast)
     .sort((a, b) => new Date(a[0]) - new Date(b[0]));
   
   const pastShifts = Object.entries(groupedShifts)
     .filter(([_, group]) => group.isPast)
-    .sort((a, b) => new Date(b[0]) - new Date(a[0])); // Più recenti prima
+    .sort((a, b) => new Date(b[0]) - new Date(a[0]));
 
   const pastShiftsCount = pastShifts.reduce((sum, [_, group]) => sum + group.shifts.length, 0);
 
@@ -82,9 +97,11 @@ const CalendarView = ({ shifts, companies, profile }) => {
     <div className="calendar-view">
       <div className="calendar-header">
         <h1>I Miei Turni</h1>
-        <button className="add-shift-btn" onClick={handleAddShift}>
-          + Aggiungi Turno
-        </button>
+        <div className="header-actions">
+          <button className="add-shift-btn" onClick={handleAddShift}>
+            + Aggiungi Turno
+          </button>
+        </div>
       </div>
 
       {shifts.loading ? (
@@ -151,7 +168,7 @@ const CalendarView = ({ shifts, companies, profile }) => {
             </div>
           )}
 
-          {/* TURNI PASSATI - COLLASSABILI */}
+          {/* TURNI PASSATI */}
           {pastShifts.length > 0 && (
             <div className="shifts-section past-section">
               <button 

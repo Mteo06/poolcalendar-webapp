@@ -831,3 +831,121 @@ input:checked + .toggle-slider:before {
     font-size: 28px;
   }
 }
+/* Export Calendario */
+.export-info {
+  margin-bottom: 20px;
+}
+
+.calendar-export-actions {
+  display: flex;
+  flex-direction: row;
+  gap: 12px;
+  margin-bottom: 24px;
+  flex-wrap: nowrap;
+}
+
+.btn-export-profile {
+  background: white;
+  color: #667eea;
+  border: 2px solid #667eea;
+  padding: 14px 20px;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-decoration: none;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.btn-export-profile:hover {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+  border-color: transparent;
+}
+
+.btn-export-profile.secondary {
+  background: white;
+  color: #667eea;
+  border: 2px solid #667eea;
+}
+
+.btn-export-profile.secondary:hover {
+  background: #667eea;
+  color: white;
+  border-color: #667eea;
+  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
+}
+
+/* Istruzioni */
+.export-instructions {
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid #e0e0e0;
+}
+
+.instructions-details {
+  background: #f8f9fa;
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 12px;
+  cursor: pointer;
+}
+
+.instructions-details summary {
+  font-weight: 600;
+  color: #333;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.instructions-details summary::-webkit-details-marker {
+  display: none;
+}
+
+.instructions-details[open] summary {
+  margin-bottom: 12px;
+  color: #667eea;
+}
+
+.instructions-details ol {
+  margin: 0;
+  padding-left: 20px;
+  line-height: 1.8;
+}
+
+.instructions-details li {
+  color: #666;
+  margin-bottom: 8px;
+}
+
+.instructions-details a {
+  color: #667eea;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.instructions-details a:hover {
+  text-decoration: underline;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .calendar-export-actions {
+    flex-direction: column;
+  }
+  
+  .btn-export-profile {
+    width: 100%;
+  }
+}
+

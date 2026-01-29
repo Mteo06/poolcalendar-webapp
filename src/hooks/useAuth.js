@@ -16,14 +16,15 @@ export const useAuth = () => {
 
     const createProfile = async (userId) => {
       try {
-        console.log("Creazione profilo manuale per", userId);
-    
-        const { data: userData } = await supabase.auth.getUser();
-        const currentUser = userData?.user;
-    
-        const usernameFromMeta =
-          currentUser?.user_metadata?.username ||
-          currentUser?.email?.split("@")[0];   // fallback sensato
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        const newProfile = {
+          id: userId,
+          username: currentUser?.user_metadata?.username || currentUser?.email?.split('@')[0] || 'utente',
+          email: currentUser?.email || '',
+          name: '',
+          surname: '',
+          ical_token: crypto.randomUUID()  // ← AGGIUNGI QUESTA RIGA
+        };
     
         const { data, error } = await supabase
           .from("user_profiles")  

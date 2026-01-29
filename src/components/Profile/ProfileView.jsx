@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabaseClient';
 import CompanyModal from './CompanyModal';
 import './ProfileView.css';
 
+
 const ProfileView = ({ user, profile, companies, onSignOut }) => {
   const [isEditingEmail, setIsEditingEmail] = useState(false);
   const [isEditingPassword, setIsEditingPassword] = useState(false);
@@ -205,6 +206,7 @@ const ProfileView = ({ user, profile, companies, onSignOut }) => {
           {message.text}
         </div>
       )}
+
 
       {/* Informazioni Account */}
       <div className="profile-section">
@@ -486,6 +488,95 @@ const ProfileView = ({ user, profile, companies, onSignOut }) => {
             </div>
           </div>
         )}
+      </div>
+
+
+
+      {/* Export Calendario */}
+      <div className="profile-section">
+        <div className="section-header">
+          <h2>📅 Esporta Calendario</h2>
+        </div>
+
+        <div className="export-info">
+          <p className="info-text">
+            💡 Sincronizza i tuoi turni con Google Calendar, Apple Calendar o qualsiasi calendario che supporta iCal.
+          </p>
+        </div>
+
+        <div className="calendar-export-actions">
+          <button 
+            className="btn-export-profile" 
+            onClick={() => {
+              const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+              const userId = profile?.id;
+              const token = profile?.ical_token;
+              const url = `https://${supabaseUrl.replace('https://', '')}/functions/v1/ical-export?user=${userId}&token=${token}`;
+              navigator.clipboard.writeText(url);
+              
+              // Mostra feedback
+              const btn = document.activeElement;
+              const originalText = btn.textContent;
+              btn.textContent = '✅ Link copiato!';
+              setTimeout(() => btn.textContent = originalText, 2000);
+            }}
+          >
+            🔗 Copia Link Calendario
+          </button>
+
+          <a 
+            href={`webcal://${import.meta.env.VITE_SUPABASE_URL.replace('https://', '')}/functions/v1/ical-export?user=${profile?.id}&token=${profile?.ical_token}`}
+            className="btn-export-profile"
+          >
+            📅 Aggiungi a Google/Apple Calendar
+          </a>
+
+          <button 
+            className="btn-export-profile secondary" 
+            onClick={async () => {
+              // Carica turni e scarica
+              const { data: shifts } = await supabase
+                .from('shifts')
+                .select('*')
+                .eq('user_id', user.id)
+                .order('start_time', { ascending: true });
+              
+              if (shifts) {
+                const formattedShifts = shifts.map(s => ({
+                  ...s,
+                  start_time: new Date(s.start_time),
+                  end_time: new Date(s.end_time)
+                }));
+                downloadICS(formattedShifts);
+              }
+            }}
+          >
+            💾 Scarica File iCal
+          </button>
+        </div>
+
+        <div className="export-instructions">
+          <details className="instructions-details">
+            <summary>📖 Come sincronizzare con Google Calendar</summary>
+            <ol>
+              <li>Clicca su "Copia Link Calendario"</li>
+              <li>Apri <a href="https://calendar.google.com" target="_blank" rel="noopener">Google Calendar</a></li>
+              <li>Vai su "Altri calendari" → "Aggiungi da URL"</li>
+              <li>Incolla il link copiato</li>
+              <li>I turni si sincronizzano automaticamente! ✅</li>
+            </ol>
+          </details>
+
+          <details className="instructions-details">
+            <summary>📖 Come sincronizzare con Apple Calendar (iPhone/Mac)</summary>
+            <ol>
+              <li>Clicca su "Aggiungi a Google/Apple Calendar"</li>
+              <li>Si apre l'app Calendario</li>
+              <li>Conferma l'aggiunta del calendario</li>
+              <li>I turni appaiono automaticamente! ✅</li>
+            </ol>
+          </details>
+        </div>
       </div>
 
       {/* Società */}
