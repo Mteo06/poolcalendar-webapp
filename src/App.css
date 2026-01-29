@@ -145,3 +145,15 @@ body {
     font-size: 22px;
   }
 }
+
+/* ✅ FIX alternativo: Riserva spazio per scrollbar */
+body {
+  margin: 0;
+  padding: 0;
+  overflow-y: scroll; /* Scrollbar sempre presente */
+}
+
+/* Per browser Webkit (Chrome, Safari) */
+::-webkit-scrollbar {
+  width: 15px; /* Larghezza standard scrollbar */
+}
