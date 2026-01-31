@@ -508,22 +508,33 @@ const ProfileView = ({ user, profile, companies, onSignOut }) => {
 
         <div className="calendar-export-actions">
           <button 
-            className="btn-export-profile" 
-            onClick={async () => {
+            className="btn-export-profile"
+            onClick={async (event) => {
               try {
                 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
                 const userId = profile?.id;
                 const token = profile?.ical_token;
                 const url = `https://${supabaseUrl.replace('https://', '')}/functions/v1/ical-export?user=${userId}&token=${token}`;
                 
-                await navigator.clipboard.writeText(url);
+                // ✅ Fallback per Android/Web
+                try {
+                  await navigator.clipboard.writeText(url);
+                } catch (clipboardErr) {
+                  const textArea = document.createElement('textarea');
+                  textArea.value = url;
+                  textArea.style.position = 'fixed';
+                  textArea.style.left = '-999999px';
+                  document.body.appendChild(textArea);
+                  textArea.select();
+                  document.execCommand('copy');
+                  document.body.removeChild(textArea);
+                }
                 
-                // ✅ FIX: Mostra feedback senza cambiare pagina
+                // Feedback visivo
                 const btn = event.target.closest('button');
                 const originalText = btn.innerHTML;
                 btn.innerHTML = '✅ Link copiato!';
                 btn.disabled = true;
-                
                 setTimeout(() => {
                   btn.innerHTML = originalText;
                   btn.disabled = false;
@@ -534,15 +545,14 @@ const ProfileView = ({ user, profile, companies, onSignOut }) => {
               }
             }}
           >
-            🔗 Copia Link Calendario
+            📋 Copia Link Calendario
           </button>
-
 
           <a 
             href={`webcal://${import.meta.env.VITE_SUPABASE_URL.replace('https://', '')}/functions/v1/ical-export?user=${profile?.id}&token=${profile?.ical_token}`}
             className="btn-export-profile"
           >
-            📅 Aggiungi a Google/Apple Calendar
+            📅 Aggiungi ad Apple Calendar
           </a>
 
         <button 
@@ -578,7 +588,7 @@ const ProfileView = ({ user, profile, companies, onSignOut }) => {
               }));
               
               // Scarica iCal
-              downloadICS(formattedShifts);
+              downloadICS(formattedShifts, companies.companies);
             } catch (err) {
               console.error('Errore export completo:', err);
               alert('Errore durante l\'export: ' + err.message);
@@ -591,7 +601,7 @@ const ProfileView = ({ user, profile, companies, onSignOut }) => {
 
         <div className="export-instructions">
           <details className="instructions-details">
-            <summary>📖 Come sincronizzare con Google Calendar</summary>
+            <summary>📖 Come sincronizzare con Google Calendar (solo da web)</summary>
             <ol>
               <li>Clicca su "Copia Link Calendario"</li>
               <li>Apri <a href="https://calendar.google.com" target="_blank" rel="noopener">Google Calendar</a></li>
@@ -604,7 +614,7 @@ const ProfileView = ({ user, profile, companies, onSignOut }) => {
           <details className="instructions-details">
             <summary>📖 Come sincronizzare con Apple Calendar (iPhone/Mac)</summary>
             <ol>
-              <li>Clicca su "Aggiungi a Google/Apple Calendar"</li>
+              <li>Clicca su "Aggiungi ad Apple Calendar"</li>
               <li>Si apre l'app Calendario</li>
               <li>Conferma l'aggiunta del calendario</li>
               <li>I turni appaiono automaticamente! ✅</li>

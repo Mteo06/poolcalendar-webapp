@@ -6,53 +6,45 @@ const CompanyModal = ({ company, onClose, onSave }) => {
   const [formData, setFormData] = useState({
     name: '',
     roles: {
-      AB: { hourly_rate: 0 },
-      Accoglienza: { hourly_rate: 0 },
-      Istruttore: { hourly_rate: 0 },
-      Reception: { hourly_rate: 0 }
+      'AB': { hourly_rate: '' },
+      'Accoglienza': { hourly_rate: '' },
+      'Istruttore': { hourly_rate: '' },
+      'Reception': { hourly_rate: '' }
     },
     facilities: []
   });
+  
   const [newFacility, setNewFacility] = useState('');
-  const [newRole, setNewRole] = useState(''); // ✅ NUOVO
-  const [newRoleRate, setNewRoleRate] = useState(''); // ✅ NUOVO
+  const [newRole, setNewRole] = useState('');
+  const [newRoleRate, setNewRoleRate] = useState('');
 
   useEffect(() => {
     if (company) {
       setFormData({
         name: company.name || '',
         roles: company.roles || {
-          AB: { hourly_rate: 0 },
-          Accoglienza: { hourly_rate: 0 },
-          Istruttore: { hourly_rate: 0 },
-          Reception: { hourly_rate: 0 }
+          'AB': { hourly_rate: '' },
+          'Accoglienza': { hourly_rate: '' },
+          'Istruttore': { hourly_rate: '' },
+          'Reception': { hourly_rate: '' }
         },
         facilities: company.facilities || []
       });
     }
   }, [company]);
 
+  // ✅ FIX: Accetta sia virgola che punto per decimali
   const handleRoleChange = (role, value) => {
-    if (value === '' || value === '.') {
-      setFormData({
-        ...formData,
-        roles: {
-          ...formData.roles,
-          [role]: { hourly_rate: value }
-        }
-      });
-    } else {
-      const numValue = parseFloat(value);
-      if (!isNaN(numValue)) {
-        setFormData({
-          ...formData,
-          roles: {
-            ...formData.roles,
-            [role]: { hourly_rate: numValue }
-          }
-        });
+    // Permetti solo numeri, punto e virgola
+    const cleanValue = value.replace(/[^0-9.,]/g, '').replace(',', '.');
+    
+    setFormData({
+      ...formData,
+      roles: {
+        ...formData.roles,
+        [role]: { hourly_rate: cleanValue }
       }
-    }
+    });
   };
 
   const handleRemoveRole = (role) => {
@@ -64,14 +56,15 @@ const CompanyModal = ({ company, onClose, onSave }) => {
     });
   };
 
-  // ✅ NUOVO: Funzione per aggiungere ruolo
+  // ✅ Funzione per aggiungere ruolo personalizzato
   const handleAddRole = () => {
     if (newRole.trim() && !formData.roles[newRole.trim()]) {
+      const cleanRate = newRoleRate.replace(',', '.');
       setFormData({
         ...formData,
         roles: {
           ...formData.roles,
-          [newRole.trim()]: { hourly_rate: parseFloat(newRoleRate) || 0 }
+          [newRole.trim()]: { hourly_rate: cleanRate || '0' }
         }
       });
       setNewRole('');
@@ -98,14 +91,16 @@ const CompanyModal = ({ company, onClose, onSave }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     try {
       const { data: { user } } = await supabase.auth.getUser();
 
+      // ✅ Normalizza i valori convertendo virgole in punti
       const normalizedRoles = {};
       Object.keys(formData.roles).forEach(role => {
+        const rateValue = String(formData.roles[role].hourly_rate).replace(',', '.');
         normalizedRoles[role] = {
-          hourly_rate: parseFloat(formData.roles[role].hourly_rate) || 0
+          hourly_rate: parseFloat(rateValue) || 0
         };
       });
 
@@ -114,12 +109,15 @@ const CompanyModal = ({ company, onClose, onSave }) => {
         roles: normalizedRoles
       };
 
+      // Milanosport (default) - salva solo in localStorage
       if (company?.is_default) {
         localStorage.setItem('milanosport_custom', JSON.stringify({
           roles: dataToSave.roles,
           facilities: dataToSave.facilities
         }));
-      } else if (company && !company.is_default) {
+      } 
+      // Modifica società esistente
+      else if (company && !company.is_default) {
         await supabase
           .from('companies')
           .update({
@@ -128,7 +126,9 @@ const CompanyModal = ({ company, onClose, onSave }) => {
             facilities: dataToSave.facilities
           })
           .eq('id', company.id);
-      } else {
+      } 
+      // Nuova società
+      else {
         await supabase
           .from('companies')
           .insert([{
@@ -142,6 +142,7 @@ const CompanyModal = ({ company, onClose, onSave }) => {
       onSave();
     } catch (error) {
       console.error('Errore salvataggio società:', error);
+      alert('Errore durante il salvataggio');
     }
   };
 
@@ -149,161 +150,139 @@ const CompanyModal = ({ company, onClose, onSave }) => {
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content company-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h2>{company ? 'Modifica Società' : 'Nuova Società'}</h2>
+          <h2>{company?.is_default ? '⚙️ Personalizza Milanosport' : company ? '✏️ Modifica Società' : '➕ Nuova Società'}</h2>
           <button className="close-btn" onClick={onClose}>×</button>
         </div>
 
-        <form onSubmit={handleSubmit} className="company-form">
-          {company?.is_default && (
-            <div className="info-banner">
-              ℹ️ Milanosport è una società predefinita. Puoi personalizzare ruoli e impianti.
-            </div>
-          )}
-
-          <div className="form-group">
-            <label>Nome Società</label>
-            <input
-              type="text"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              required
-              disabled={company?.is_default}
-              placeholder="es. ASD Nuoto"
-            />
-          </div>
-
-          <div className="form-section">
-            <h3>💶 Paghe Orarie</h3>
-            <p className="form-hint">Imposta la paga oraria per ogni ruolo</p>
+        <form onSubmit={handleSubmit}>
+          <div className="modal-body">
             
-            <div className="roles-grid">
-              {Object.keys(formData.roles).map((role) => (
-                <div key={role} className="role-input">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <label>{role}</label>
+            {/* Nome Società */}
+            {!company?.is_default && (
+              <div className="form-group">
+                <label>Nome Società *</label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="Es: Aquamore, Swim Academy..."
+                  required
+                />
+              </div>
+            )}
+
+            {/* Ruoli e Paghe */}
+            <div className="form-group">
+              <label>💰 Ruoli e Paghe Orarie</label>
+              <div className="roles-list">
+                {Object.entries(formData.roles).map(([role, data]) => (
+                  <div key={role} className="role-row">
+                    <span className="role-name">{role}</span>
+                    <div className="role-input-group">
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={data.hourly_rate}
+                        onChange={(e) => handleRoleChange(role, e.target.value)}
+                        placeholder="0.00"
+                        className="role-rate-input"
+                      />
+                      <span className="currency">€/h</span>
+                    </div>
+                    {Object.keys(formData.roles).length > 1 && (
+                      <button
+                        type="button"
+                        className="btn-remove-role"
+                        onClick={() => handleRemoveRole(role)}
+                        title="Rimuovi ruolo"
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* Aggiungi Ruolo Personalizzato */}
+              <div className="add-role-section">
+                <h4>➕ Aggiungi Ruolo Personalizzato</h4>
+                <div className="add-role-form">
+                  <input
+                    type="text"
+                    value={newRole}
+                    onChange={(e) => setNewRole(e.target.value)}
+                    placeholder="Nome ruolo"
+                    className="new-role-input"
+                  />
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={newRoleRate}
+                    onChange={(e) => setNewRoleRate(e.target.value.replace(/[^0-9.,]/g, '').replace(',', '.'))}
+                    placeholder="Paga (€/h)"
+                    className="new-role-rate-input"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddRole}
+                    className="btn-add-role"
+                    disabled={!newRole.trim()}
+                  >
+                    Aggiungi
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Impianti */}
+            <div className="form-group">
+              <label>🏊 Impianti</label>
+              <div className="facilities-list">
+                {formData.facilities.map((facility, index) => (
+                  <div key={index} className="facility-tag">
+                    <span>{facility}</span>
                     <button
                       type="button"
-                      onClick={() => handleRemoveRole(role)}
-                      className="btn-remove-role"
-                      title="Elimina ruolo"
+                      onClick={() => handleRemoveFacility(index)}
+                      className="remove-facility-btn"
                     >
                       ×
                     </button>
                   </div>
-                  <div className="input-with-unit">
-                    <input
-                      type="text"
-                      value={formData.roles[role].hourly_rate === 0 ? '' : formData.roles[role].hourly_rate}
-                      onChange={(e) => handleRoleChange(role, e.target.value)}
-                      onFocus={(e) => e.target.select()}
-                      onBlur={(e) => {
-                        const val = e.target.value;
-                        if (val === '' || val === '.') {
-                          handleRoleChange(role, '0');
-                        }
-                      }}
-                      placeholder="0.00"
-                    />
-                    <span className="unit">€/h</span>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
 
-            {/* ✅ NUOVO: Form per aggiungere ruolo */}
-            <div className="add-role-section">
-              <p className="form-hint" style={{ marginTop: '16px', marginBottom: '8px' }}>
-                Aggiungi nuovo ruolo
-              </p>
-              <div className="add-role">
+              <div className="add-facility-form">
                 <input
                   type="text"
-                  value={newRole}
-                  onChange={(e) => setNewRole(e.target.value)}
-                  placeholder="Nome ruolo (es. Supervisore)"
+                  value={newFacility}
+                  onChange={(e) => setNewFacility(e.target.value)}
+                  placeholder="Nome impianto"
                   onKeyPress={(e) => {
                     if (e.key === 'Enter') {
                       e.preventDefault();
-                      handleAddRole();
-                    }
-                  }}
-                />
-                <input
-                  type="text"
-                  value={newRoleRate}
-                  onChange={(e) => {
-                    const val = e.target.value.replace(',', '.');
-                    if (val === '' || /^\d*\.?\d*$/.test(val)) {
-                      setNewRoleRate(val);
-                    }
-                  }}
-                  placeholder="Paga (€/h)"
-                  className="rate-input"
-                  onKeyPress={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      handleAddRole();
+                      handleAddFacility();
                     }
                   }}
                 />
                 <button
                   type="button"
-                  onClick={handleAddRole}
+                  onClick={handleAddFacility}
                   className="btn-add-facility"
+                  disabled={!newFacility.trim()}
                 >
-                  + Aggiungi
+                  Aggiungi
                 </button>
               </div>
             </div>
-          </div>
 
-          <div className="form-section">
-            <h3>🏊 Impianti</h3>
-            <p className="form-hint">Aggiungi gli impianti dove lavori</p>
-            
-            <div className="add-facility">
-              <input
-                type="text"
-                value={newFacility}
-                onChange={(e) => setNewFacility(e.target.value)}
-                placeholder="Nome impianto (es. Piscina Cozzi)"
-                onKeyPress={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleAddFacility();
-                  }
-                }}
-              />
-              <button
-                type="button"
-                onClick={handleAddFacility}
-                className="btn-add-facility"
-              >
-                + Aggiungi
-              </button>
-            </div>
-
-            <div className="facilities-list">
-              {formData.facilities.map((facility, index) => (
-                <div key={index} className="facility-item">
-                  <span>{facility}</span>
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveFacility(index)}
-                    className="btn-remove-facility"
-                  >
-                    ×
-                  </button>
-                </div>
-              ))}
-            </div>
           </div>
 
           <div className="modal-footer">
-            <button type="button" onClick={onClose} className="cancel-btn">
+            <button type="button" className="btn-cancel" onClick={onClose}>
               Annulla
             </button>
-            <button type="submit" className="save-btn">
+            <button type="submit" className="btn-save">
               {company ? 'Salva Modifiche' : 'Crea Società'}
             </button>
           </div>
