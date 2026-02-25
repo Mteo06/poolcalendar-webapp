@@ -1,121 +1,135 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from './lib/supabaseClient';
+import { useAuth } from './hooks/useAuth';
+import { useShifts } from './hooks/useShifts';
+import { useCompanies } from './hooks/useCompanies';
 import LoginView from './components/Auth/LoginView';
 import RegisterView from './components/Auth/RegisterView';
 import ResetPasswordView from './components/Auth/ResetPasswordView';
 import LoadingSpinner from './components/Common/LoadingSpinner';
-import ErrorBoundary from './components/Common/ErrorBoundary';
-import Navigation from './components/Navigation/Navigation';
 import CalendarView from './components/Calendar/CalendarView';
 import SummaryView from './components/Summary/SummaryView';
 import ProfileView from './components/Profile/ProfileView';
+import Navigation from './components/Navigation/Navigation';
 import CoordinatorDashboard from './views/coordinator/CoordinatorDashboard';
 import SecretaryDashboard from './views/secretary/SecretaryDashboard';
 import './App.css';
 
-
 function App() {
-  const [session,    setSession]    = useState(null);
-  const [profile,    setProfile]    = useState(null);
-  const [loading,    setLoading]    = useState(true);
-  const [authView,   setAuthView]   = useState('login');
+  const auth = useAuth();
+  const shifts = useShifts(auth.user?.id);
+  const companies = useCompanies(auth.user?.id);
+
+  const [showRegister, setShowRegister] = useState(false);
+  const [showResetPassword, setShowResetPassword] = useState(false);
+  const [resendMessage, setResendMessage] = useState('');
   const [activeView, setActiveView] = useState('calendar');
 
-
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      if (session) fetchProfile(session.user.id);
-      else setLoading(false);
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      if (session) fetchProfile(session.user.id);
-      else { setProfile(null); setLoading(false); }
-    });
-
-    return () => subscription.unsubscribe();
+    const hash = window.location.hash;
+    if (hash && hash.includes('type=recovery')) {
+      setShowResetPassword(true);
+    }
   }, []);
 
-
-  const fetchProfile = async (userId) => {
-    try {
-      const { data, error } = await supabase
-        .from('user_profiles').select('*').eq('id', userId).single();
-      if (error) throw error;
-      setProfile(data);
-    } catch (err) {
-      console.error('Errore profilo:', err);
-    } finally {
-      setLoading(false);
-    }
+  const handleResendEmail = async () => {
+    const result = await auth.resendConfirmationEmail();
+    setResendMessage(result.success ? 'Email di conferma inviata!' : 'Errore nell\'invio dell\'email');
+    setTimeout(() => setResendMessage(''), 3000);
   };
 
-
-  const handleLogin = async (email, password) => {
-    try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) return { success: false, error: error.message };
-      return { success: true };
-    } catch (err) {
-      return { success: false, error: err.message || 'Errore sconosciuto' };
-    }
+  const handleResetComplete = () => {
+    setShowResetPassword(false);
+    window.location.hash = '';
   };
 
+  if (showResetPassword) return <ResetPasswordView onComplete={handleResetComplete} />;
+  if (auth.loading) return <LoadingSpinner />;
 
-  const handleSignOut = async () => await supabase.auth.signOut();
-
-
-  if (loading) return <LoadingSpinner />;
-
-
-  if (!session) {
-    if (authView === 'register') return <RegisterView onSwitchToLogin={() => setAuthView('login')} />;
-    if (authView === 'reset')    return <ResetPasswordView onSwitchToLogin={() => setAuthView('login')} />;
+  // Email non confermata
+  if (auth.user && !auth.emailConfirmed) {
     return (
+      <div className="pending-container">
+        <div className="pending-card">
+          <h1>📧 Conferma la tua email</h1>
+          <div className="email-confirm-message">
+            <p>Abbiamo inviato un'email di conferma a:</p>
+            <p className="email-highlight">{auth.user.email}</p>
+            <p>Clicca sul link nell'email per attivare il tuo account.</p>
+            <p className="note">Dopo aver confermato, ricarica questa pagina.</p>
+          </div>
+          <button className="resend-btn" onClick={handleResendEmail}>
+            Reinvia email di conferma
+          </button>
+          {resendMessage && <p className="auth-success">{resendMessage}</p>}
+        </div>
+      </div>
+    );
+  }
+
+  // Non autenticato
+  if (!auth.isAuthenticated) {
+    return showRegister ? (
+      <RegisterView onSwitchToLogin={() => setShowRegister(false)} />
+    ) : (
       <LoginView
-        onLogin={handleLogin}
-        onSwitchToRegister={() => setAuthView('register')}
-        onSwitchToReset={() => setAuthView('reset')}
+        onLogin={auth.signIn}
+        onSwitchToRegister={() => setShowRegister(true)}
       />
     );
   }
 
+  // ── NUOVI RUOLI ──────────────────────────────────────────
+  if (auth.profile?.role === 'coordinator') {
+    return (
+      <CoordinatorDashboard
+        user={auth.user}
+        profile={auth.profile}
+        onSignOut={auth.signOut}
+      />
+    );
+  }
 
-  if (profile?.role === 'coordinator') return (
-    <ErrorBoundary>
-      <CoordinatorDashboard user={session.user} profile={profile} onSignOut={handleSignOut} />
-    </ErrorBoundary>
-  );
+  if (auth.profile?.role === 'secretary') {
+    return (
+      <SecretaryDashboard
+        user={auth.user}
+        profile={auth.profile}
+        onSignOut={auth.signOut}
+      />
+    );
+  }
+  // ─────────────────────────────────────────────────────────
 
-
-  if (profile?.role === 'secretary') return (
-    <ErrorBoundary>
-      <SecretaryDashboard user={session.user} profile={profile} onSignOut={handleSignOut} />
-    </ErrorBoundary>
-  );
-
-
-  const renderView = () => {
-    switch (activeView) {
-      case 'calendar': return <CalendarView user={session.user} profile={profile} />;
-      case 'summary':  return <SummaryView  user={session.user} profile={profile} />;
-      case 'profile':  return <ProfileView  user={session.user} profile={profile} onSignOut={handleSignOut} />;
-      default:         return <CalendarView user={session.user} profile={profile} />;
-    }
-  };
-
-
+  // Worker — app normale
   return (
-    <ErrorBoundary>
-      <div className="app">
-        <Navigation activeView={activeView} onNavigate={setActiveView} />
-        <main className="main-content">{renderView()}</main>
-      </div>
-    </ErrorBoundary>
+    <div className="app-container">
+      <Navigation activeView={activeView} onNavigate={setActiveView} />
+      <main className="main-content">
+        {activeView === 'calendar' && (
+          <CalendarView
+            shifts={shifts}
+            companies={companies}
+            profile={auth.profile}
+          />
+        )}
+        {activeView === 'summary' && (
+          <SummaryView
+            shifts={shifts}
+            companies={companies}
+            profile={auth.profile}
+          />
+        )}
+        {activeView === 'profile' && (
+          <ProfileView
+            user={auth.user}
+            profile={auth.profile}
+            companies={companies}
+            onSignOut={auth.signOut}
+          />
+        )}
+      </main>
+    </div>
   );
 }
-
 
 export default App;
