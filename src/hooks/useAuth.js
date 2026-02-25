@@ -15,39 +15,45 @@ export const useAuth = () => {
     };
 
     const createProfile = async (userId) => {
-      try {
-        const { data: { user: currentUser } } = await supabase.auth.getUser();
-        const meta = currentUser?.user_metadata || {};
-        const usernameFromMeta = meta.username || currentUser?.email?.split('@')[0] || 'utente';
+    try {
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      const meta = currentUser?.user_metadata || {};
+      const usernameFromMeta = meta.username || currentUser?.email?.split('@')[0] || 'utente';
 
-        const { data, error } = await supabase
+      // Prima prova a fare upsert senza sovrascrivere role se esiste
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .upsert({
+          id:         userId,
+          email:      currentUser?.email,
+          username:   usernameFromMeta,
+          full_name:  meta.full_name  || '',
+          phone:      meta.phone      || null,
+          birth_date: meta.birth_date || null,
+          role:       meta.role       || 'worker',
+        }, {
+          onConflict: 'id',
+          ignoreDuplicates: true  // ← non sovrascrive se esiste già
+        })
+        .select('id, username, full_name, phone, birth_date, role, email')
+        .single();
+
+      if (data) {
+        setSafeState(setProfile, data);
+      } else {
+        // Prova solo a leggere — potrebbe già esistere
+        const { data: existing } = await supabase
           .from('user_profiles')
-          .insert({
-            id: userId,
-            username: usernameFromMeta,
-            full_name: meta.full_name || '',
-            phone: meta.phone || null,
-            birth_date: meta.birth_date || null,
-            role: meta.role || 'worker',
-          })
-          .select('id, username, full_name, phone, birth_date, role')
+          .select('id, username, full_name, phone, birth_date, role, email')
+          .eq('id', userId)
           .single();
-
-        if (data) {
-          setSafeState(setProfile, data);
-        } else {
-          console.error('Errore creazione profilo:', error);
-          setSafeState(setProfile, {
-            id: userId,
-            username: usernameFromMeta,
-            full_name: meta.full_name || '',
-            role: meta.role || 'worker',
-          });
-        }
-      } catch (err) {
-        console.error('Errore createProfile:', err);
+        if (existing) setSafeState(setProfile, existing);
       }
-    };
+    } catch (err) {
+      console.error('Errore createProfile:', err);
+    }
+  };
+
 
     const fetchProfile = async (userId) => {
       try {
