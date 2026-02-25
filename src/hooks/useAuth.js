@@ -15,68 +15,60 @@ export const useAuth = () => {
     };
 
     const createProfile = async (userId) => {
-    try {
-      const { data: { user: currentUser } } = await supabase.auth.getUser();
-      const meta = currentUser?.user_metadata || {};
-      const usernameFromMeta = meta.username || currentUser?.email?.split('@')[0] || 'utente';
-
-      // Prima prova a fare upsert senza sovrascrivere role se esiste
-      const { data, error } = await supabase
-        .from('user_profiles')
-        .upsert({
-          id:         userId,
-          email:      currentUser?.email,
-          username:   usernameFromMeta,
-          full_name:  meta.full_name  || '',
-          phone:      meta.phone      || null,
-          birth_date: meta.birth_date || null,
-          role:       meta.role       || 'worker',
-        }, {
-          onConflict: 'id',
-          ignoreDuplicates: true  // ← non sovrascrive se esiste già
-        })
-        .select('id, username, full_name, phone, birth_date, role, email')
-        .single();
-
-      if (data) {
-        setSafeState(setProfile, data);
-      } else {
-        // Prova solo a leggere — potrebbe già esistere
-        const { data: existing } = await supabase
-          .from('user_profiles')
-          .select('id, username, full_name, phone, birth_date, role, email')
-          .eq('id', userId)
-          .single();
-        if (existing) setSafeState(setProfile, existing);
-      }
-    } catch (err) {
-      console.error('Errore createProfile:', err);
-    }
-  };
-
-
-    const fetchProfile = async (userId) => {
       try {
-        const { data, error, status } = await supabase
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        const meta = currentUser?.user_metadata || {};
+
+        const { data, error } = await supabase
           .from('user_profiles')
-          .select('id, username, full_name, phone, birth_date, role') // ← role incluso
-          .eq('id', userId)
+          .insert({
+            id:         userId,
+            email:      currentUser?.email,
+            username:   meta.username   || currentUser?.email?.split('@')[0] || 'utente',
+            full_name:  meta.full_name  || '',
+            phone:      meta.phone      || null,
+            birth_date: meta.birth_date || null,
+            role:       meta.role       || 'worker',
+          })
+          .select('id, username, full_name, phone, birth_date, role, email')
           .single();
 
         if (data) {
           setSafeState(setProfile, data);
-        } else if (error) {
-          if (status === 406 || error.details?.includes('0 rows')) {
-            await createProfile(userId);
-            return;
-          } else {
-            console.error('Errore caricamento profilo:', error);
-          }
+        } else {
+          // Insert fallito → profilo già esiste, rileggi
+          const { data: existing } = await supabase
+            .from('user_profiles')
+            .select('id, username, full_name, phone, birth_date, role, email')
+            .eq('id', userId)
+            .maybeSingle();
+          if (existing) setSafeState(setProfile, existing);
+        }
+      } catch (err) {
+        console.error('Errore createProfile:', err);
+      } finally {
+        setSafeState(setLoading, false); // ← sempre
+      }
+    };
+
+    const fetchProfile = async (userId) => {
+      try {
+        const { data } = await supabase
+          .from('user_profiles')
+          .select('id, username, full_name, phone, birth_date, role, email')
+          .eq('id', userId)
+          .maybeSingle(); // ← non genera 406, ritorna null se non esiste
+
+        if (data) {
+          setSafeState(setProfile, data);
+          setSafeState(setLoading, false);
+        } else {
+          // Profilo non esiste → crealo
+          await createProfile(userId);
         }
       } catch (err) {
         console.error('Eccezione in fetchProfile:', err);
-      } finally {
-        setSafeState(setLoading, false);
+        setSafeState(setLoading, false); // ← sempre
       }
     };
 
@@ -90,7 +82,7 @@ export const useAuth = () => {
           const confirmed = session.user.email_confirmed_at !== null;
           setSafeState(setEmailConfirmed, confirmed);
           if (confirmed) {
-            fetchProfile(session.user.id);
+            await fetchProfile(session.user.id);
           } else {
             setSafeState(setLoading, false);
           }
