@@ -100,7 +100,10 @@ export const useAuth = () => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (!mounted) return;
 
-      if (session?.user) {
+      // ← Ignora INITIAL_SESSION, lo gestisce già initAuth
+      if (event === 'INITIAL_SESSION') return;
+
+      if (event === 'SIGNED_IN' && session?.user) {
         setSafeState(setUser, session.user);
         const confirmed = session.user.email_confirmed_at !== null;
         setSafeState(setEmailConfirmed, confirmed);
@@ -116,6 +119,7 @@ export const useAuth = () => {
         setSafeState(setLoading, false);
       }
     });
+
 
     return () => {
       mounted = false;
