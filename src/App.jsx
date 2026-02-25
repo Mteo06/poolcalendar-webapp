@@ -18,6 +18,8 @@ function App() {
   const auth = useAuth();
   const shifts = useShifts(auth.user?.id);
   const companies = useCompanies(auth.user?.id);
+  console.log('profile:', auth.profile);
+  console.log('role:', auth.profile?.role);
 
   const [showRegister, setShowRegister] = useState(false);
   const [showResetPassword, setShowResetPassword] = useState(false);
