@@ -13,6 +13,7 @@ import CoordinatorDashboard from './views/coordinator/CoordinatorDashboard';
 import SecretaryDashboard from './views/secretary/SecretaryDashboard';
 import './App.css';
 
+
 function App() {
   const [session,    setSession]    = useState(null);
   const [profile,    setProfile]    = useState(null);
@@ -20,19 +21,23 @@ function App() {
   const [authView,   setAuthView]   = useState('login');
   const [activeView, setActiveView] = useState('calendar');
 
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       if (session) fetchProfile(session.user.id);
       else setLoading(false);
     });
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       if (session) fetchProfile(session.user.id);
       else { setProfile(null); setLoading(false); }
     });
+
     return () => subscription.unsubscribe();
   }, []);
+
 
   const fetchProfile = async (userId) => {
     try {
@@ -47,20 +52,36 @@ function App() {
     }
   };
 
+
+  const handleLogin = async (email, password) => {
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) return { success: false, error: error.message };
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err.message || 'Errore sconosciuto' };
+    }
+  };
+
+
   const handleSignOut = async () => await supabase.auth.signOut();
 
+
   if (loading) return <LoadingSpinner />;
+
 
   if (!session) {
     if (authView === 'register') return <RegisterView onSwitchToLogin={() => setAuthView('login')} />;
     if (authView === 'reset')    return <ResetPasswordView onSwitchToLogin={() => setAuthView('login')} />;
     return (
       <LoginView
+        onLogin={handleLogin}
         onSwitchToRegister={() => setAuthView('register')}
         onSwitchToReset={() => setAuthView('reset')}
       />
     );
   }
+
 
   if (profile?.role === 'coordinator') return (
     <ErrorBoundary>
@@ -68,11 +89,13 @@ function App() {
     </ErrorBoundary>
   );
 
+
   if (profile?.role === 'secretary') return (
     <ErrorBoundary>
       <SecretaryDashboard user={session.user} profile={profile} onSignOut={handleSignOut} />
     </ErrorBoundary>
   );
+
 
   const renderView = () => {
     switch (activeView) {
@@ -83,6 +106,7 @@ function App() {
     }
   };
 
+
   return (
     <ErrorBoundary>
       <div className="app">
@@ -92,5 +116,6 @@ function App() {
     </ErrorBoundary>
   );
 }
+
 
 export default App;
