@@ -20,6 +20,8 @@ function App() {
   const companies = useCompanies(auth.user?.id);
   console.log('PROFILE:', auth.profile);
   console.log('ROLE:', auth.profile?.role);
+  console.log('PROFILE:', auth.profile); // ← aggiungi questa riga
+
 
   const [showRegister, setShowRegister] = useState(false);
   const [showResetPassword, setShowResetPassword] = useState(false);
