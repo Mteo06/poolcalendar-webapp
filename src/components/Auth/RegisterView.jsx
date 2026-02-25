@@ -18,38 +18,43 @@ const RegisterView = ({ onSwitchToLogin }) => {
     { id: 'secretary',   icon: '🗂️', title: 'Segreteria',   description: 'Visualizza il piano vasca in sola lettura.' },
   ];
 
-    const handleRegister = async (e) => {
-    e.preventDefault();
-    if (formData.password !== formData.confirmPassword) {
-      setMessage({ type: 'error', text: 'Le password non corrispondono' }); return;
-    }
-    if (formData.password.length < 6) {
-      setMessage({ type: 'error', text: 'Password minimo 6 caratteri' }); return;
-    }
-    setLoading(true);
-    setMessage({ type: '', text: '' });
-    try {
-      const { error } = await supabase.auth.signUp({
-        email: formData.email,
-        password: formData.password,
-        options: {
-          data: {
-            username:   formData.username,
-            full_name:  formData.full_name,
-            phone:      formData.phone || null,
-            birth_date: formData.birth_date || null,
-            role:       selectedRole,
-          }
+const handleRegister = async (e) => {
+  e.preventDefault();
+  if (formData.password !== formData.confirmPassword) {
+    setMessage({ type: 'error', text: 'Le password non corrispondono' }); return;
+  }
+  if (formData.password.length < 6) {
+    setMessage({ type: 'error', text: 'Password minimo 6 caratteri' }); return;
+  }
+  setLoading(true);
+  setMessage({ type: '', text: '' });
+  try {
+    const { error } = await supabase.auth.signUp({
+      email: formData.email,
+      password: formData.password,
+      options: {
+        data: {
+          username:   formData.username,
+          full_name:  formData.full_name,
+          phone:      formData.phone || null,
+          birth_date: formData.birth_date || null,
+          role:       selectedRole,
         }
-      });
-      if (error) throw error;
-      setMessage({ type: 'success', text: 'Registrazione completata! Controlla la tua email.' });
-    } catch (error) {
-      setMessage({ type: 'error', text: error.message });
-    } finally {
-      setLoading(false);
-    }
-  };
+      }
+    });
+    if (error) throw error;
+
+    // ← Mostra alert e vai al login dopo 2 secondi
+    alert('✅ Registrazione completata!\n\nControlla la tua email e clicca sul link di verifica prima di accedere.');
+    onSwitchToLogin();
+
+  } catch (error) {
+    setMessage({ type: 'error', text: error.message });
+  } finally {
+    setLoading(false);
+  }
+};
+
 
 
   return (
