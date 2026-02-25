@@ -1,129 +1,95 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from './hooks/useAuth';
-import { useShifts } from './hooks/useShifts';
-import { useCompanies } from './hooks/useCompanies';
+import { supabase } from './lib/supabaseClient';
 import LoginView from './components/Auth/LoginView';
 import RegisterView from './components/Auth/RegisterView';
 import ResetPasswordView from './components/Auth/ResetPasswordView';
 import LoadingSpinner from './components/Common/LoadingSpinner';
+import ErrorBoundary from './components/Common/ErrorBoundary';
+import Navigation from './components/Navigation/Navigation';
 import CalendarView from './components/Calendar/CalendarView';
 import SummaryView from './components/Summary/SummaryView';
 import ProfileView from './components/Profile/ProfileView';
-import Navigation from './components/Navigation/Navigation';
+import CoordinatorDashboard from './views/coordinator/CoordinatorDashboard';
+import SecretaryDashboard from './views/secretary/SecretaryDashboard';
 import './App.css';
 
 function App() {
-  const auth = useAuth();
-  const shifts = useShifts(auth.user?.id);
-  const companies = useCompanies(auth.user?.id);
-
-  const [showRegister, setShowRegister] = useState(false);
-  const [showResetPassword, setShowResetPassword] = useState(false);
-  const [resendMessage, setResendMessage] = useState('');
+  const [session,    setSession]    = useState(null);
+  const [profile,    setProfile]    = useState(null);
+  const [loading,    setLoading]    = useState(true);
+  const [authView,   setAuthView]   = useState('login');
   const [activeView, setActiveView] = useState('calendar');
 
-  // Controlla se è una pagina di reset password
   useEffect(() => {
-    const hash = window.location.hash;
-    if (hash && hash.includes('type=recovery')) {
-      setShowResetPassword(true);
-    }
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      if (session) fetchProfile(session.user.id);
+      else setLoading(false);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      if (session) fetchProfile(session.user.id);
+      else { setProfile(null); setLoading(false); }
+    });
+    return () => subscription.unsubscribe();
   }, []);
 
-  const handleResendEmail = async () => {
-    const result = await auth.resendConfirmationEmail();
-    if (result.success) {
-      setResendMessage('Email di conferma inviata!');
-    } else {
-      setResendMessage('Errore nell\'invio dell\'email');
+  const fetchProfile = async (userId) => {
+    try {
+      const { data, error } = await supabase
+        .from('user_profiles').select('*').eq('id', userId).single();
+      if (error) throw error;
+      setProfile(data);
+    } catch (err) {
+      console.error('Errore profilo:', err);
+    } finally {
+      setLoading(false);
     }
-    setTimeout(() => setResendMessage(''), 3000);
   };
 
-  const handleResetComplete = () => {
-    setShowResetPassword(false);
-    window.location.hash = '';
-    // L'utente verrà automaticamente loggato da Supabase
-  };
+  const handleSignOut = async () => await supabase.auth.signOut();
 
-  // Mostra reset password se necessario
-  if (showResetPassword) {
-    return <ResetPasswordView onComplete={handleResetComplete} />;
-  }
+  if (loading) return <LoadingSpinner />;
 
-  // Loading
-  if (auth.loading) {
-    return <LoadingSpinner />;
-  }
-
-  // Email non confermata
-  if (auth.user && !auth.emailConfirmed) {
+  if (!session) {
+    if (authView === 'register') return <RegisterView onSwitchToLogin={() => setAuthView('login')} />;
+    if (authView === 'reset')    return <ResetPasswordView onSwitchToLogin={() => setAuthView('login')} />;
     return (
-      <div className="pending-container">
-        <div className="pending-card">
-          <h1>📧 Conferma la tua email</h1>
-          <div className="email-confirm-message">
-            <p>Abbiamo inviato un'email di conferma a:</p>
-            <p className="email-highlight">{auth.user.email}</p>
-            <p>Clicca sul link nell'email per attivare il tuo account.</p>
-            <p className="note">Dopo aver confermato, ricarica questa pagina.</p>
-          </div>
-          <button className="resend-btn" onClick={handleResendEmail}>
-            Reinvia email di conferma
-          </button>
-          {resendMessage && <p className="auth-success">{resendMessage}</p>}
-        </div>
-      </div>
-    );
-  }
-
-  // Non autenticato
-  if (!auth.isAuthenticated) {
-    return showRegister ? (
-      <RegisterView 
-        onRegister={auth.signUp}
-        onSwitchToLogin={() => setShowRegister(false)}
-      />
-    ) : (
-      <LoginView 
-        onLogin={auth.signIn}
-        onSwitchToRegister={() => setShowRegister(true)}
+      <LoginView
+        onSwitchToRegister={() => setAuthView('register')}
+        onSwitchToReset={() => setAuthView('reset')}
       />
     );
   }
 
-  // Autenticato - mostra app principale
+  if (profile?.role === 'coordinator') return (
+    <ErrorBoundary>
+      <CoordinatorDashboard user={session.user} profile={profile} onSignOut={handleSignOut} />
+    </ErrorBoundary>
+  );
+
+  if (profile?.role === 'secretary') return (
+    <ErrorBoundary>
+      <SecretaryDashboard user={session.user} profile={profile} onSignOut={handleSignOut} />
+    </ErrorBoundary>
+  );
+
+  const renderView = () => {
+    switch (activeView) {
+      case 'calendar': return <CalendarView user={session.user} profile={profile} />;
+      case 'summary':  return <SummaryView  user={session.user} profile={profile} />;
+      case 'profile':  return <ProfileView  user={session.user} profile={profile} onSignOut={handleSignOut} />;
+      default:         return <CalendarView user={session.user} profile={profile} />;
+    }
+  };
+
   return (
-    <div className="app-container">
-      <Navigation activeView={activeView} onNavigate={setActiveView} />
-      
-      <main className="main-content">
-        {activeView === 'calendar' && (
-          <CalendarView 
-            shifts={shifts}
-            companies={companies}
-            profile={auth.profile}
-          />
-        )}
-        
-        {activeView === 'summary' && (
-          <SummaryView 
-            shifts={shifts}
-            companies={companies}
-            profile={auth.profile}
-          />
-        )}
-        
-        {activeView === 'profile' && (
-          <ProfileView 
-            user={auth.user}
-            profile={auth.profile}
-            companies={companies}
-            onSignOut={auth.signOut}
-          />
-        )}
-      </main>
-    </div>
+    <ErrorBoundary>
+      <div className="app">
+        <Navigation activeView={activeView} onNavigate={setActiveView} />
+        <main className="main-content">{renderView()}</main>
+      </div>
+    </ErrorBoundary>
   );
 }
 
