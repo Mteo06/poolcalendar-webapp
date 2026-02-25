@@ -18,10 +18,6 @@ function App() {
   const auth = useAuth();
   const shifts = useShifts(auth.user?.id);
   const companies = useCompanies(auth.user?.id);
-  console.log('PROFILE:', auth.profile);
-  console.log('ROLE:', auth.profile?.role);
-  console.log('PROFILE:', auth.profile); // ← aggiungi questa riga
-
 
   const [showRegister, setShowRegister] = useState(false);
   const [showResetPassword, setShowResetPassword] = useState(false);
@@ -47,7 +43,12 @@ function App() {
   };
 
   if (showResetPassword) return <ResetPasswordView onComplete={handleResetComplete} />;
+
+  // ← Aspetta sia auth che profilo
   if (auth.loading) return <LoadingSpinner />;
+
+  // ← Se utente loggato ma profilo ancora null, aspetta
+  if (auth.isAuthenticated && !auth.profile) return <LoadingSpinner />;
 
   // Email non confermata
   if (auth.user && !auth.emailConfirmed) {
@@ -82,7 +83,7 @@ function App() {
     );
   }
 
-  // ── NUOVI RUOLI ──────────────────────────────────────────
+  // ── Ruoli ────────────────────────────────────────────────
   if (auth.profile?.role === 'coordinator') {
     return (
       <CoordinatorDashboard

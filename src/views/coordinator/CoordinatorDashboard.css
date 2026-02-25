@@ -134,3 +134,46 @@
   .coord-nav-btn .nav-label { display: none; }
   .coord-nav-btn { padding: 14px 16px; }
 }
+/* Piscine */
+.facilities-title {
+  font-size: 15px;
+  color: #1e3a5f;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.saving-badge {
+  font-size: 11px;
+  color: #6b7280;
+  font-weight: 400;
+  font-style: italic;
+}
+.facilities-hint {
+  font-size: 12px;
+  color: #9ca3af;
+  margin-bottom: 14px;
+}
+.facilities-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.facility-toggle-btn {
+  padding: 8px 20px;
+  border-radius: 20px;
+  border: 2px solid #e5e7eb;
+  background: white;
+  color: #374151;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.facility-toggle-btn:hover  { border-color: #2d6a9f; color: #2d6a9f; }
+.facility-toggle-btn.active { border-color: #2d6a9f; background: #2d6a9f; color: white; }
+.facilities-warning {
+  margin-top: 10px;
+  font-size: 12px;
+  color: #f59e0b;
+}

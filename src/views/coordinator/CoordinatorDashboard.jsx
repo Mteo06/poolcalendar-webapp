@@ -5,10 +5,14 @@ import WorkersList from './WorkersList';
 import WorkerEarnings from './WorkerEarnings';
 import './CoordinatorDashboard.css';
 
+const ALL_FACILITIES = ['COZZI', 'CARDANO', 'SAINI', 'LIDO', 'PONZIO'];
+
 const CoordinatorDashboard = ({ user, profile, onSignOut }) => {
   const [activeView, setActiveView] = useState('piano');
   const [workers,    setWorkers]    = useState([]);
   const [loading,    setLoading]    = useState(true);
+  const [facilities, setFacilities] = useState(profile?.facilities || []);
+  const [savingFac,  setSavingFac]  = useState(false);
 
   useEffect(() => { fetchWorkers(); }, []);
 
@@ -27,12 +31,27 @@ const CoordinatorDashboard = ({ user, profile, onSignOut }) => {
     }
   };
 
+  const toggleFacility = async (f) => {
+    const updated = facilities.includes(f)
+      ? facilities.filter(x => x !== f)
+      : [...facilities, f];
+    setFacilities(updated);
+    setSavingFac(true);
+    await supabase.from('user_profiles')
+      .update({ facilities: updated })
+      .eq('id', user.id);
+    setSavingFac(false);
+  };
+
   const addWorker = async (email) => {
     try {
       const { data: found, error } = await supabase
-        .from('user_profiles').select('id,username,full_name,email,role').eq('email', email).single();
-      if (error || !found) return { success: false, error: 'Utente non trovato.' };
-      if (found.role !== 'worker') return { success: false, error: "L'utente non è un Lavoratore." };
+        .from('user_profiles')
+        .select('id,username,full_name,email,role')
+        .or(`email.eq.${email},username.eq.${email}`)
+        .single();
+      if (error || !found) return { success: false, error: 'Utente non trovato. Assicurati che sia registrato.' };
+      if (found.role !== 'worker') return { success: false, error: `L'utente è registrato come "${found.role}", non come Lavoratore.` };
       const { error: insErr } = await supabase
         .from('coordinator_workers').insert({ coordinator_id: user.id, worker_id: found.id });
       if (insErr) {
@@ -90,12 +109,32 @@ const CoordinatorDashboard = ({ user, profile, onSignOut }) => {
           <div className="coord-loading"><div className="spinner"></div><p>Caricamento...</p></div>
         ) : (
           <>
-            {activeView === 'piano'    && <PianoVasca user={user} workers={workers} isCoordinator={true} />}
-            {activeView === 'workers'  && <WorkersList workers={workers} onAddWorker={addWorker} onRemoveWorker={removeWorker} />}
-            {activeView === 'earnings' && <WorkerEarnings user={user} workers={workers} />}
-            {activeView === 'profile'  && (
+            {activeView === 'piano' && (
+              <PianoVasca
+                user={user}
+                workers={workers}
+                isCoordinator={true}
+                coordinatorFacilities={facilities}
+              />
+            )}
+
+            {activeView === 'workers' && (
+              <WorkersList
+                workers={workers}
+                onAddWorker={addWorker}
+                onRemoveWorker={removeWorker}
+              />
+            )}
+
+            {activeView === 'earnings' && (
+              <WorkerEarnings user={user} workers={workers} />
+            )}
+
+            {activeView === 'profile' && (
               <div className="coord-profile-page">
                 <h2>👤 Il mio Profilo</h2>
+
+                {/* Info personali */}
                 <div className="coord-profile-card">
                   <div className="profile-row"><span>Nome</span><strong>{profile?.full_name || '—'}</strong></div>
                   <div className="profile-row"><span>Username</span><strong>{profile?.username}</strong></div>
@@ -103,6 +142,29 @@ const CoordinatorDashboard = ({ user, profile, onSignOut }) => {
                   <div className="profile-row"><span>Ruolo</span><strong>📋 Coordinatore</strong></div>
                   <div className="profile-row"><span>Lavoratori gestiti</span><strong>{workers.length}</strong></div>
                 </div>
+
+                {/* Selezione piscine */}
+                <div className="coord-profile-card">
+                  <h3 className="facilities-title">
+                    🏊 Piscine gestite
+                    {savingFac && <span className="saving-badge">Salvataggio...</span>}
+                  </h3>
+                  <p className="facilities-hint">Seleziona le piscine che gestisci — appariranno come filtro nel Piano Vasca.</p>
+                  <div className="facilities-grid">
+                    {ALL_FACILITIES.map(f => (
+                      <button
+                        key={f}
+                        onClick={() => toggleFacility(f)}
+                        className={`facility-toggle-btn ${facilities.includes(f) ? 'active' : ''}`}>
+                        {facilities.includes(f) ? '✓ ' : ''}{f}
+                      </button>
+                    ))}
+                  </div>
+                  {facilities.length === 0 && (
+                    <p className="facilities-warning">⚠️ Nessuna piscina selezionata — nel Piano Vasca vedrai tutte le piscine.</p>
+                  )}
+                </div>
+
                 <button className="btn-logout-full" onClick={onSignOut}>🚪 Esci</button>
               </div>
             )}
