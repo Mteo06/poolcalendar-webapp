@@ -17,72 +17,58 @@ export const useAuth = () => {
     const createProfile = async (userId) => {
       try {
         const { data: { user: currentUser } } = await supabase.auth.getUser();
-        const newProfile = {
-          id: userId,
-          username: currentUser?.user_metadata?.username || currentUser?.email?.split('@')[0] || 'utente',
-          email: currentUser?.email || '',
-          name: '',
-          surname: '',
-          ical_token: crypto.randomUUID()  // ← AGGIUNGI QUESTA RIGA
-        };
-    
+        const meta = currentUser?.user_metadata || {};
+        const usernameFromMeta = meta.username || currentUser?.email?.split('@')[0] || 'utente';
+
         const { data, error } = await supabase
-          .from("user_profiles")  
+          .from('user_profiles')
           .insert({
             id: userId,
             username: usernameFromMeta,
-            email: currentUser?.email,
-            name: "",
-            surname: "",
+            full_name: meta.full_name || '',
+            phone: meta.phone || null,
+            birth_date: meta.birth_date || null,
+            role: meta.role || 'worker',
           })
-          .select()
+          .select('id, username, full_name, phone, birth_date, role')
           .single();
 
         if (data) {
-          console.log("Profilo creato:", data);
-          setProfile(data);
+          setSafeState(setProfile, data);
         } else {
-          console.error("Errore creazione profilo:", error);
-          // fallback comunque coerente
-          setProfile({
+          console.error('Errore creazione profilo:', error);
+          setSafeState(setProfile, {
             id: userId,
             username: usernameFromMeta,
-            email: currentUser?.email,
-            name: "",
-            surname: "",
+            full_name: meta.full_name || '',
+            role: meta.role || 'worker',
           });
-
         }
       } catch (err) {
-        console.error("Errore creazione profilo:", err);
+        console.error('Errore createProfile:', err);
       }
     };
-    
 
     const fetchProfile = async (userId) => {
       try {
         const { data, error, status } = await supabase
-        .from('user_profiles')  
-        .select('*')
-        .eq('id', userId)
-        .single();
-
+          .from('user_profiles')
+          .select('id, username, full_name, phone, birth_date, role') // ← role incluso
+          .eq('id', userId)
+          .single();
 
         if (data) {
           setSafeState(setProfile, data);
         } else if (error) {
-          // Se profilo non esiste, crealo
-          if (status === 406 || (error.details?.includes('0 rows'))) {
+          if (status === 406 || error.details?.includes('0 rows')) {
             await createProfile(userId);
             return;
           } else {
-            console.error('❌ Error loading profile:', error);
+            console.error('Errore caricamento profilo:', error);
           }
-        } else {
-          console.warn('⚠️ fetchProfile: no data, no error');
         }
       } catch (err) {
-        console.error('💥 Exception in fetchProfile:', err);
+        console.error('Eccezione in fetchProfile:', err);
       } finally {
         setSafeState(setLoading, false);
       }
@@ -91,16 +77,14 @@ export const useAuth = () => {
     const initAuth = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
-
         if (!mounted) return;
 
         if (session?.user) {
           setSafeState(setUser, session.user);
           const confirmed = session.user.email_confirmed_at !== null;
           setSafeState(setEmailConfirmed, confirmed);
-
           if (confirmed) {
-            fetchProfile(session.user.id); // 🔹 senza await
+            fetchProfile(session.user.id);
           } else {
             setSafeState(setLoading, false);
           }
@@ -108,7 +92,7 @@ export const useAuth = () => {
           setSafeState(setLoading, false);
         }
       } catch (err) {
-        console.error('❌ Init auth error:', err);
+        console.error('Init auth error:', err);
         setSafeState(setLoading, false);
       }
     };
@@ -122,9 +106,8 @@ export const useAuth = () => {
         setSafeState(setUser, session.user);
         const confirmed = session.user.email_confirmed_at !== null;
         setSafeState(setEmailConfirmed, confirmed);
-
         if (confirmed) {
-          fetchProfile(session.user.id); // 🔹 senza await
+          fetchProfile(session.user.id);
         } else {
           setSafeState(setLoading, false);
         }
@@ -142,24 +125,19 @@ export const useAuth = () => {
     };
   }, []);
 
-  // --- Funzioni Auth ---
   const signUp = async (email, password, username) => {
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          data: { username },             // <-- username finisce in user_metadata
+          data: { username },
           emailRedirectTo: window.location.origin,
         },
       });
-  
       if (error) throw error;
-  
-      console.log("Registrazione completata", data);
       return { success: true, data, needsEmailConfirmation: !data.session };
     } catch (error) {
-      console.error("Errore registrazione:", error);
       return { success: false, error: error.message };
     }
   };
@@ -178,7 +156,6 @@ export const useAuth = () => {
           }
         });
       }
-
       return { success: true, data };
     } catch (error) {
       return { success: false, error: error.message };
@@ -219,6 +196,6 @@ export const useAuth = () => {
     signIn,
     signOut,
     resendConfirmationEmail,
-    isAuthenticated: !!user && emailConfirmed
+    isAuthenticated: !!user && emailConfirmed,
   };
 };
