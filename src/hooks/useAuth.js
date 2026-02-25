@@ -52,25 +52,31 @@ export const useAuth = () => {
     };
 
     const fetchProfile = async (userId) => {
+      const timeout = setTimeout(() => {
+        setSafeState(setLoading, false);
+      }, 5000); // ← dopo 5s sblocca comunque
+
       try {
         const { data } = await supabase
           .from('user_profiles')
           .select('id, username, full_name, phone, birth_date, role, email')
           .eq('id', userId)
-          .maybeSingle(); // ← non genera 406, ritorna null se non esiste
+          .maybeSingle();
 
         if (data) {
           setSafeState(setProfile, data);
-          setSafeState(setLoading, false);
         } else {
-          // Profilo non esiste → crealo
           await createProfile(userId);
         }
       } catch (err) {
         console.error('Eccezione in fetchProfile:', err);
-        setSafeState(setLoading, false); // ← sempre
+      } finally {
+        clearTimeout(timeout);
+        setSafeState(setLoading, false);
       }
     };
+
+
 
     const initAuth = async () => {
       try {

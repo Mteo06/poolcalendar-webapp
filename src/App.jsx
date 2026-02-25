@@ -18,8 +18,6 @@ function App() {
   const auth = useAuth();
   const shifts = useShifts(auth.user?.id);
   const companies = useCompanies(auth.user?.id);
-  console.log('profile:', auth.profile);
-  console.log('role:', auth.profile?.role);
 
   const [showRegister, setShowRegister] = useState(false);
   const [showResetPassword, setShowResetPassword] = useState(false);
@@ -35,7 +33,7 @@ function App() {
 
   const handleResendEmail = async () => {
     const result = await auth.resendConfirmationEmail();
-    setResendMessage(result.success ? 'Email di conferma inviata!' : 'Errore nell\'invio dell\'email');
+    setResendMessage(result.success ? 'Email di conferma inviata!' : "Errore nell'invio dell'email");
     setTimeout(() => setResendMessage(''), 3000);
   };
 
@@ -44,13 +42,11 @@ function App() {
     window.location.hash = '';
   };
 
+  // Reset password
   if (showResetPassword) return <ResetPasswordView onComplete={handleResetComplete} />;
 
-  // ← Aspetta sia auth che profilo
+  // Caricamento auth
   if (auth.loading) return <LoadingSpinner />;
-
-  // ← Se utente loggato ma profilo ancora null, aspetta
-  if (auth.isAuthenticated && !auth.profile) return <LoadingSpinner />;
 
   // Email non confermata
   if (auth.user && !auth.emailConfirmed) {
@@ -85,8 +81,11 @@ function App() {
     );
   }
 
-  // ── Ruoli ────────────────────────────────────────────────
-  if (auth.profile?.role === 'coordinator') {
+  // Autenticato ma profilo ancora in caricamento → aspetta max 5s poi procedi
+  if (!auth.profile) return <LoadingSpinner />;
+
+  // ── Ruoli ─────────────────────────────────────────────────
+  if (auth.profile.role === 'coordinator') {
     return (
       <CoordinatorDashboard
         user={auth.user}
@@ -96,7 +95,7 @@ function App() {
     );
   }
 
-  if (auth.profile?.role === 'secretary') {
+  if (auth.profile.role === 'secretary') {
     return (
       <SecretaryDashboard
         user={auth.user}
@@ -105,7 +104,7 @@ function App() {
       />
     );
   }
-  // ─────────────────────────────────────────────────────────
+  // ──────────────────────────────────────────────────────────
 
   // Worker — app normale
   return (
