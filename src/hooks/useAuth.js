@@ -2,9 +2,9 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
 
 export const useAuth = () => {
-  const [user, setUser] = useState(null);
-  const [profile, setProfile] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [user,           setUser]           = useState(null);
+  const [profile,        setProfile]        = useState(null);
+  const [loading,        setLoading]        = useState(true);
   const [emailConfirmed, setEmailConfirmed] = useState(true);
 
   useEffect(() => {
@@ -36,7 +36,6 @@ export const useAuth = () => {
         if (data) {
           setSafeState(setProfile, data);
         } else {
-          // Insert fallito → profilo già esiste, rileggi
           const { data: existing } = await supabase
             .from('user_profiles')
             .select('id, username, full_name, phone, birth_date, role, email')
@@ -47,15 +46,11 @@ export const useAuth = () => {
       } catch (err) {
         console.error('Errore createProfile:', err);
       } finally {
-        setSafeState(setLoading, false); // ← sempre
+        setSafeState(setLoading, false);
       }
     };
 
     const fetchProfile = async (userId) => {
-      const timeout = setTimeout(() => {
-        setSafeState(setLoading, false);
-      }, 5000); // ← dopo 5s sblocca comunque
-
       try {
         const { data } = await supabase
           .from('user_profiles')
@@ -71,12 +66,9 @@ export const useAuth = () => {
       } catch (err) {
         console.error('Eccezione in fetchProfile:', err);
       } finally {
-        clearTimeout(timeout);
         setSafeState(setLoading, false);
       }
     };
-
-
 
     const initAuth = async () => {
       try {
@@ -105,8 +97,6 @@ export const useAuth = () => {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (!mounted) return;
-
-      // ← Ignora INITIAL_SESSION, lo gestisce già initAuth
       if (event === 'INITIAL_SESSION') return;
 
       if (event === 'SIGNED_IN' && session?.user) {
@@ -125,7 +115,6 @@ export const useAuth = () => {
         setSafeState(setLoading, false);
       }
     });
-
 
     return () => {
       mounted = false;
@@ -150,20 +139,11 @@ export const useAuth = () => {
     }
   };
 
-  const signIn = async (email, password, rememberMe = false) => {
+  // ← rememberMe rimosso: era lui a cancellare i token sb- appena creati
+  const signIn = async (email, password) => {
     try {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
-
-      if (!rememberMe) {
-        Object.keys(localStorage).forEach(key => {
-          if (key.startsWith('sb-')) {
-            const value = localStorage.getItem(key);
-            sessionStorage.setItem(key, value);
-            localStorage.removeItem(key);
-          }
-        });
-      }
       return { success: true, data };
     } catch (error) {
       return { success: false, error: error.message };
@@ -172,12 +152,12 @@ export const useAuth = () => {
 
   const signOut = async () => {
     await supabase.auth.signOut();
-    [...Object.keys(localStorage), ...Object.keys(sessionStorage)].forEach(key => {
-      if (key.startsWith('sb-')) {
-        localStorage.removeItem(key);
-        sessionStorage.removeItem(key);
-      }
-    });
+    [...Object.keys(localStorage), ...Object.keys(sessionStorage)]
+      .filter(k => k.startsWith('sb-'))
+      .forEach(k => {
+        localStorage.removeItem(k);
+        sessionStorage.removeItem(k);
+      });
     setUser(null);
     setProfile(null);
     setEmailConfirmed(true);
